@@ -1,7 +1,8 @@
 use super::intrinsics::gen_intrinsics;
 use super::ops;
-use crate::{asm, comment, global, label, segment, sys_exit, OutputType};
-use crate::{instruction::*, CompilerOptions};
+use crate::cli::{CompilerOptions, OutputType};
+use crate::instruction::*;
+use crate::{asm, comment, global, label, segment, sys_exit};
 
 pub fn compile(program: &Program, opt: CompilerOptions) -> Result<(), Box<dyn std::error::Error>> {
     let mut asm = vec![];
@@ -14,6 +15,7 @@ pub fn compile(program: &Program, opt: CompilerOptions) -> Result<(), Box<dyn st
     let Program {
         instructions: program,
         name: program_name,
+        ..
     } = program;
 
     for inst in program {
@@ -78,6 +80,8 @@ pub fn compile(program: &Program, opt: CompilerOptions) -> Result<(), Box<dyn st
             Instruction::Gt => ops::gt(&mut asm),
             Instruction::Lte => ops::lte(&mut asm),
             Instruction::Gte => ops::gte(&mut asm),
+            Instruction::Macro => unreachable!("Macro should be expanded before codegen"),
+            Instruction::Name(_) => unreachable!("Name should be expanded before codegen"),
         }
     }
 

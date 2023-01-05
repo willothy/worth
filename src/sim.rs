@@ -137,6 +137,8 @@ pub fn simulate(program: &Program) -> Result<(), String> {
                 let b = stack.pop().unwrap();
                 stack.push((a >= b) as i64);
             }
+            Instruction::Macro => unreachable!("Macro should be expanded before simulation"),
+            Instruction::Name(_) => unreachable!("Name should be expanded before simulation"),
         }
         ip += 1;
     }

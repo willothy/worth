@@ -1,6 +1,10 @@
-10
-while dup 0 <= do
-    dup .
-    1 -
+macro test
+    while dup 0 <= do
+        dup .
+        1 -
+    end
 end
+
+10
+    test
 0
