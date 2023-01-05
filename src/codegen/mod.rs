@@ -1,5 +1,5 @@
 mod compile;
-mod intrinsics;
+pub mod intrinsics;
 mod macros;
 mod ops;
 

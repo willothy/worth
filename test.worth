@@ -1,9 +1,6 @@
-34 35 + 69 = if
-    69 .
-    0
-else
-    420 .
-    1
+10
+while dup 0 <= do
+    dup .
+    1 -
 end
-.
 0

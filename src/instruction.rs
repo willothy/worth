@@ -2,6 +2,8 @@ use std::{fmt::Display, str::FromStr};
 
 use strum_macros::{EnumString, IntoStaticStr};
 
+use crate::intrinsics;
+
 #[derive(Debug, Clone)]
 pub struct Program {
     pub name: String,
@@ -28,9 +30,24 @@ pub enum Value {
 pub enum Instruction {
     Push(Value),
     Intrinsic(Intrinsic),
-    If { else_ip: usize },
-    Else { else_ip: usize, end_ip: usize },
-    End { end_ip: usize },
+    While {
+        self_ip: usize,
+        do_ip: usize,
+    },
+    Do {
+        end_ip: usize,
+    },
+    If {
+        else_ip: usize,
+    },
+    Else {
+        else_ip: usize,
+        end_ip: usize,
+    },
+    End {
+        self_ip: usize,
+        while_ip: Option<usize>,
+    },
     Add,
     Sub,
     Mul,
@@ -73,12 +90,20 @@ impl From<&str> for Instruction {
             ">" => Instruction::Gt,
             "<=" => Instruction::Lte,
             ">=" => Instruction::Gte,
+            "while" => Instruction::While {
+                self_ip: 0,
+                do_ip: 0,
+            },
+            "do" => Instruction::Do { end_ip: 0 },
             "if" => Instruction::If { else_ip: 0 },
             "else" => Instruction::Else {
                 else_ip: 0,
                 end_ip: 0,
             },
-            "end" => Instruction::End { end_ip: 0 },
+            "end" => Instruction::End {
+                self_ip: 0,
+                while_ip: None,
+            },
             "." => Instruction::Intrinsic(Intrinsic::Dump),
             intrinsic => {
                 if let Ok(intrinsic) = Intrinsic::from_str(intrinsic) {
@@ -90,13 +115,16 @@ impl From<&str> for Instruction {
         }
     }
 }
-
+/*
 #[derive(Debug, IntoStaticStr, EnumString, Clone)]
 #[strum(ascii_case_insensitive)]
 pub enum Intrinsic {
     Dump,
     Panic,
-}
+    Dup,
+} */
+
+intrinsics!(Dump, Panic, Dup);
 
 impl Display for Intrinsic {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

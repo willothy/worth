@@ -82,20 +82,36 @@ fn resolve_jumps(program: &mut Program) {
     for (ip, instruction) in program.instructions.iter_mut().enumerate() {
         match instruction {
             Instruction::If { else_ip } => {
-                jump_stack.push(("if", else_ip));
+                jump_stack.push(("if", 0, else_ip));
             }
             Instruction::Else { else_ip, end_ip } => {
-                let (kind, precursor_else_ip) = jump_stack.pop().unwrap();
+                let (kind, _, precursor_else_ip) = jump_stack.pop().unwrap();
                 assert_eq!(kind, "if");
                 *precursor_else_ip = ip;
                 *else_ip = ip;
-                jump_stack.push(("else", end_ip));
+                jump_stack.push(("else", 0, end_ip));
             }
-            Instruction::End { end_ip } => {
-                let (kind, precursor_end_ip) = jump_stack.pop().unwrap();
-                assert!(kind == "if" || kind == "else");
+            Instruction::End {
+                self_ip,
+                while_ip: end_ip,
+            } => {
+                let (kind, while_ip, precursor_end_ip) = jump_stack.pop().unwrap();
+                assert!(kind == "if" || kind == "else" || kind == "do");
                 *precursor_end_ip = ip;
-                *end_ip = ip;
+                *self_ip = ip;
+                if kind == "do" {
+                    *end_ip = Some(while_ip);
+                }
+            }
+            Instruction::While { self_ip, do_ip } => {
+                *self_ip = ip;
+                jump_stack.push(("while", ip, do_ip));
+            }
+            Instruction::Do { end_ip } => {
+                let (kind, while_ip, precursor_do_ip) = jump_stack.pop().unwrap();
+                assert_eq!(kind, "while");
+                *precursor_do_ip = ip;
+                jump_stack.push(("do", while_ip, end_ip));
             }
             _ => {}
         }

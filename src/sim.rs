@@ -8,10 +8,17 @@ pub fn simulate(program: &Program) -> Result<(), String> {
     let mut stack = Vec::new();
 
     let mut ip = 0;
-
     while ip < program.len() {
         let inst = &program[ip];
         match &inst {
+            Instruction::While { .. } => {}
+            Instruction::Do { end_ip } => {
+                let a = stack.pop().unwrap();
+                if a == 0 {
+                    ip = *end_ip + 1;
+                    continue;
+                }
+            }
             Instruction::If { else_ip } => {
                 let a = stack.pop().unwrap();
                 if a == 0 {
@@ -23,7 +30,12 @@ pub fn simulate(program: &Program) -> Result<(), String> {
                 ip = *end_ip;
                 continue;
             }
-            Instruction::End { .. } => {}
+            Instruction::End { while_ip, .. } => {
+                if let Some(while_ip) = while_ip {
+                    ip = *while_ip;
+                    continue;
+                }
+            }
             Instruction::Push(val) => match val {
                 Value::Int(i) => stack.push(*i),
                 Value::Char(c) => stack.push((*c) as i64),
@@ -35,6 +47,11 @@ pub fn simulate(program: &Program) -> Result<(), String> {
                     let a = stack.pop().unwrap();
                     println!("{}", a);
                 }
+                Intrinsic::Dup => {
+                    let a = stack.pop().unwrap();
+                    stack.push(a);
+                    stack.push(a);
+                }
             },
             Instruction::Add => {
                 let a = stack.pop().unwrap();
@@ -44,7 +61,7 @@ pub fn simulate(program: &Program) -> Result<(), String> {
             Instruction::Sub => {
                 let a = stack.pop().unwrap();
                 let b = stack.pop().unwrap();
-                stack.push(a - b);
+                stack.push(b - a);
             }
             Instruction::Mul => {
                 let a = stack.pop().unwrap();
@@ -54,7 +71,7 @@ pub fn simulate(program: &Program) -> Result<(), String> {
             Instruction::Div => {
                 let a = stack.pop().unwrap();
                 let b = stack.pop().unwrap();
-                stack.push(a / b);
+                stack.push(b / a);
             }
             Instruction::Mod => {
                 let a = stack.pop().unwrap();

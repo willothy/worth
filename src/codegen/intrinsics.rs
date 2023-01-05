@@ -5,7 +5,14 @@ pub fn panic(asm: &mut Vec<String>) {
 }
 
 pub fn dump(asm: &mut Vec<String>) {
-    asm!(asm, "pop     rdi", "call    intrinsic_dump");
+    asm!(asm, "pop     rdi", with "Load argument to rdi");
+    asm!(asm, "call    intrinsic_dump");
+}
+
+pub fn dup(asm: &mut Vec<String>) {
+    asm!(asm, "pop     rax");
+    asm!(asm, "push    rax");
+    asm!(asm, "push    rax");
 }
 
 pub fn gen_intrinsics(asm: &mut Vec<String>) {

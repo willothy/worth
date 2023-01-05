@@ -15,8 +15,8 @@ pub fn sub(asm: &mut Vec<String>) {
     comment!(asm, "-- sub --");
     asm!(
         asm,
-        "pop     rax",
         "pop     rbx",
+        "pop     rax",
         "sub     rax, rbx",
         "push    rax"
     );
@@ -35,42 +35,90 @@ pub fn mul(asm: &mut Vec<String>) {
 
 pub fn div(asm: &mut Vec<String>) {
     comment!(asm, "-- div --");
-    todo!()
+    // TODO: Test this
+    asm!(
+        asm,
+        "pop     rax",
+        "pop     rbx",
+        "cqo",
+        "idiv    rbx",
+        "push    rax"
+    );
 }
 
 pub fn rem(asm: &mut Vec<String>) {
     comment!(asm, "-- mod --");
-    todo!()
+    // TODO: Test this
+    asm!(
+        asm,
+        "pop     rax",
+        "pop     rcx",
+        "cqo",
+        "idiv    rcx",
+        "push    rdx"
+    );
 }
 
 pub fn not(asm: &mut Vec<String>) {
     comment!(asm, "-- not --");
-    todo!()
+    asm!(asm, "pop     rax");
+    asm!(asm, "neg     rax");
+    asm!(asm, "push    rax");
 }
 
 pub fn and(asm: &mut Vec<String>) {
     comment!(asm, "-- and --");
-    todo!()
+    asm!(
+        asm,
+        "pop     rax",
+        "pop     rbx",
+        "and     rax, rbx",
+        "push    rax"
+    );
 }
 
 pub fn or(asm: &mut Vec<String>) {
     comment!(asm, "-- or --");
-    todo!()
+    asm!(
+        asm,
+        "pop     rax",
+        "pop     rbx",
+        "or      rax, rbx",
+        "push    rax"
+    );
 }
 
 pub fn xor(asm: &mut Vec<String>) {
     comment!(asm, "-- xor --");
-    todo!()
+    asm!(
+        asm,
+        "pop     rax",
+        "pop     rbx",
+        "xor     rax, rbx",
+        "push    rax"
+    );
 }
 
 pub fn shl(asm: &mut Vec<String>) {
     comment!(asm, "-- shl --");
-    todo!()
+    asm!(
+        asm,
+        "pop     rax",
+        "pop     rcx",
+        "shl     rax, cl",
+        "push    rax"
+    );
 }
 
 pub fn shr(asm: &mut Vec<String>) {
     comment!(asm, "-- shr --");
-    todo!()
+    asm!(
+        asm,
+        "pop     rax",
+        "pop     rcx",
+        "shr     rax, cl",
+        "push    rax"
+    );
 }
 
 pub fn eq(asm: &mut Vec<String>) {
@@ -89,25 +137,70 @@ pub fn eq(asm: &mut Vec<String>) {
 
 pub fn neq(asm: &mut Vec<String>) {
     comment!(asm, "-- ne --");
-    todo!()
+    asm!(
+        asm,
+        "mov     rcx, 0",
+        "mov     rdx, 1",
+        "pop     rax",
+        "pop     rbx",
+        "cmp     rax, rbx",
+        "cmovne  rcx, rdx",
+        "push    rcx"
+    );
 }
 
 pub fn lt(asm: &mut Vec<String>) {
     comment!(asm, "-- lt --");
-    todo!()
+    asm!(
+        asm,
+        "mov     rcx, 0",
+        "mov     rdx, 1",
+        "pop     rbx",
+        "pop     rax",
+        "cmp     rax, rbx",
+        "cmovl   rcx, rdx",
+        "push    rcx"
+    );
 }
 
 pub fn gt(asm: &mut Vec<String>) {
     comment!(asm, "-- gt --");
-    todo!()
+    asm!(
+        asm,
+        "mov     rcx, 0",
+        "mov     rdx, 1",
+        "pop     rbx",
+        "pop     rax",
+        "cmp     rax, rbx",
+        "cmovg   rcx, rdx",
+        "push    rcx"
+    );
 }
 
 pub fn lte(asm: &mut Vec<String>) {
     comment!(asm, "-- le --");
-    todo!()
+    asm!(
+        asm,
+        "mov     rcx, 0",
+        "mov     rdx, 1",
+        "pop     rax",
+        "pop     rbx",
+        "cmp     rax, rbx",
+        "cmovle  rcx, rdx",
+        "push    rcx"
+    );
 }
 
 pub fn gte(asm: &mut Vec<String>) {
     comment!(asm, "-- ge --");
-    todo!()
+    asm!(
+        asm,
+        "mov     rcx, 0",
+        "mov     rdx, 1",
+        "pop     rax",
+        "pop     rbx",
+        "cmp     rax, rbx",
+        "cmovge  rcx, rdx",
+        "push    rcx"
+    );
 }
