@@ -1,7 +1,11 @@
 use std::{collections::HashMap, error::Error, str::FromStr};
 
 use nom::{
-    bytes::complete::take_while1, character::complete::multispace0, combinator::opt, IResult,
+    branch::alt,
+    bytes::complete::{tag, take_while1},
+    character::complete::{multispace0, multispace1},
+    combinator::{eof, opt},
+    IResult,
 };
 use nom_locate::LocatedSpan;
 
@@ -23,15 +27,7 @@ pub fn parse(source: String, name: &str) -> Result<Program, Box<dyn Error>> {
     let parser = Parser {
         file: name.to_string() + ".worth",
     };
-    let tokens = match parser.parse_program(source) {
-        Ok((remaining, tokens)) => {
-            if !remaining.fragment().is_empty() {
-                return Err(format!("Failed to parse program: {:?}", remaining).into());
-            }
-            tokens
-        }
-        Err(e) => return Err(format!("Failed to parse program: {:?}", e).into()),
-    };
+    let tokens = parser.parse_program(source);
 
     Ok(Program {
         name: name.to_string(),
@@ -48,23 +44,34 @@ struct Parser {
 }
 
 impl Parser {
-    pub fn parse_program<'a>(&self, input: Span<'a>) -> IResult<Span<'a>, Vec<Token>> {
+    pub fn parse_program<'a>(&self, input: Span<'a>) -> Vec<Token> {
         let mut instructions = Vec::new();
         let mut input = input;
         while let Ok((remaining, inst)) = self.parse_instruction(input) {
             instructions.push(inst);
             input = remaining;
         }
-        Ok((input, instructions))
+        instructions
     }
 
     pub fn parse_instruction<'a>(&self, input: Span<'a>) -> IResult<Span<'a>, Token> {
         let (input, _) = multispace0(input)?;
-        //println!("1: {:?}", input.fragment());
-        let (input, _) = opt(Self::comment)(input)?;
-        //println!("2: {:?}", input.fragment());
+
+        let mut input = input;
+        while let Ok((new_input, _)) = Self::comment(input) {
+            let (new_input, _) = multispace0(new_input)?;
+            input = new_input;
+        }
+        if input.fragment().is_empty() {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Eof,
+            )));
+        }
+
         let (input, instruction) = take_while1(|c: char| !c.is_whitespace())(input)?;
-        let (input, _) = multispace0(input)?;
+        let (input, _) = multispace1(input)?;
+
         let token = Token {
             value: instruction.fragment().to_string(),
             location: (self.file.clone(), 0, 0),
@@ -72,11 +79,12 @@ impl Parser {
         Ok((input, token))
     }
 
-    pub fn comment<'a>(input: Span<'a>) -> IResult<Span<'a>, Span<'a>> {
+    pub fn comment<'a>(input: Span<'a>) -> IResult<Span<'a>, ()> {
         let (input, _) = nom::bytes::complete::tag("//")(input)?;
-        let (input, comment) = nom::bytes::complete::take_until("\n")(input)?;
-        let (input, _) = nom::bytes::complete::tag("\n")(input)?;
-        Ok((input, comment))
+        let (input, _) = multispace0(input)?;
+        let (input, _) = nom::bytes::complete::take_while(|c: char| c != '\n')(input)?;
+        let (input, _) = alt((nom::bytes::complete::tag("\n"), eof))(input)?;
+        Ok((input, ()))
     }
 }
 
@@ -91,12 +99,12 @@ impl From<&str> for Instruction {
             "*" => Instruction::Mul,
             "/" => Instruction::Div,
             "%" => Instruction::Mod,
-            "&" => Instruction::And,
-            "|" => Instruction::Or,
-            "^" => Instruction::Xor,
-            "~" => Instruction::Not,
-            "<<" => Instruction::Shl,
-            ">>" => Instruction::Shr,
+            "&" | "band" => Instruction::BitwiseAnd,
+            "|" | "bor" => Instruction::BitwiseOr,
+            "^" | "bxor" => Instruction::BitwiseXor,
+            "~" => Instruction::BitwiseNot,
+            "<<" | "shl" => Instruction::Shl,
+            ">>" | "shr" => Instruction::Shr,
             "=" => Instruction::Eq,
             "!=" => Instruction::Neq,
             "<" => Instruction::Lt,

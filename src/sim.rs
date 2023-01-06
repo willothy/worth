@@ -95,22 +95,22 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<(), String> 
                 let b = stack.pop().unwrap();
                 stack.push(a % b);
             }
-            Instruction::And => {
+            Instruction::BitwiseAnd => {
                 let a = stack.pop().unwrap();
                 let b = stack.pop().unwrap();
                 stack.push(a & b);
             }
-            Instruction::Or => {
+            Instruction::BitwiseOr => {
                 let a = stack.pop().unwrap();
                 let b = stack.pop().unwrap();
                 stack.push(a | b);
             }
-            Instruction::Xor => {
+            Instruction::BitwiseXor => {
                 let a = stack.pop().unwrap();
                 let b = stack.pop().unwrap();
                 stack.push(a ^ b);
             }
-            Instruction::Not => {
+            Instruction::BitwiseNot => {
                 let a = stack.pop().unwrap();
                 stack.push(!a);
             }

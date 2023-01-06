@@ -60,3 +60,9 @@ fn hello_world() {
 fn memory() {
     runner("memory".to_string());
 }
+
+#[test]
+#[serial]
+fn bitwise() {
+    runner("bitwise".to_string());
+}

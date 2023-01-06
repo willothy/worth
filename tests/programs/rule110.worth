@@ -1,0 +1,21 @@
+mem 1  + 1 .
+mem 28 + 1 .
+
+30 0 while 2dup > do
+    30 0 while 2dup > do
+        dup mem + , if
+            mem 30 + 42 .
+        else
+            mem 30 + 32 .
+        end
+        1 mem 30 + 1 1 syscall3
+
+        1 +
+    end
+    drop drop
+
+    mem 30 + 10 .
+    1 mem 30 + 1 1 syscall3
+
+    1 +
+end

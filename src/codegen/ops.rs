@@ -101,8 +101,8 @@ pub fn shl(asm: &mut Vec<String>) {
     comment!(asm, "-- shl --");
     asm!(
         asm,
-        ("pop", "rax"),
         ("pop", "rcx"),
+        ("pop", "rax"),
         ("shl", "rax, cl"),
         ("push", "rax")
     );
@@ -112,8 +112,8 @@ pub fn shr(asm: &mut Vec<String>) {
     comment!(asm, "-- shr --");
     asm!(
         asm,
-        ("pop", "rax"),
         ("pop", "rcx"),
+        ("pop", "rax"),
         ("shr", "rax, cl"),
         ("push", "rax")
     );
