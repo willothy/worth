@@ -2,88 +2,128 @@
 segment .text
 global _start
 _start:
-	push    10
+    push    10
     ;; -- while --
 addr_1:
     ;; -- intrinsic: dup --
-	pop     rax
-	push    rax
-	push    rax
+    pop     rax
+    push    rax
+    push    rax
     ;; -- end intrinsic --
-	push    0
+    push    0
     ;; -- le --
-	mov     rcx, 0
-	mov     rdx, 1
-	pop     rax
-	pop     rbx
-	cmp     rax, rbx
-	cmovle  rcx, rdx
-	push    rcx
-	pop     rax
-    test    rax, rax                    ; While loop condition
-    jz      addr_10                     ; Jump to end of while loop
+    mov     rcx, 0
+    mov     rdx, 1
+    pop     rax
+    pop     rbx
+    cmp     rax, rbx
+    cmovle  rcx, rdx
+    push    rcx
+    pop     rax
+    test    rax, rax                    ;; While loop condition
+    jz      addr_10                     ;; Jump to end of while loop
     ;; -- do --
     ;; -- intrinsic: dup --
-	pop     rax
-	push    rax
-	push    rax
+    pop     rax
+    push    rax
+    push    rax
     ;; -- end intrinsic --
     ;; -- intrinsic: dump --
-    pop     rdi                         ; Load argument to rdi
-	call    intrinsic_dump
+    pop     rdi                         ;; Load argument to rdi
+    call    intrinsic_dump
     ;; -- end intrinsic --
-	push    1
+    push    1
     ;; -- sub --
-	pop     rbx
-	pop     rax
-	sub     rax, rbx
-	push    rax
+    pop     rbx
+    pop     rax
+    sub     rax, rbx
+    push    rax
     ;; -- end --
-    jmp     addr_1                      ; Jump to while statement
+    jmp     addr_1                      ;; Jump to while statement
 addr_10:
-	push    0
-    pop     rbx                         ; Pop exit code into rbx
-	mov     rax, 60
-	mov     rdi, rbx
-	syscall
+    push    15
+    ;; -- while --
+addr_12:
+    ;; -- intrinsic: dup --
+    pop     rax
+    push    rax
+    push    rax
+    ;; -- end intrinsic --
+    push    0
+    ;; -- le --
+    mov     rcx, 0
+    mov     rdx, 1
+    pop     rax
+    pop     rbx
+    cmp     rax, rbx
+    cmovle  rcx, rdx
+    push    rcx
+    pop     rax
+    test    rax, rax                    ;; While loop condition
+    jz      addr_21                     ;; Jump to end of while loop
+    ;; -- do --
+    ;; -- intrinsic: dup --
+    pop     rax
+    push    rax
+    push    rax
+    ;; -- end intrinsic --
+    ;; -- intrinsic: dump --
+    pop     rdi                         ;; Load argument to rdi
+    call    intrinsic_dump
+    ;; -- end intrinsic --
+    push    1
+    ;; -- sub --
+    pop     rbx
+    pop     rax
+    sub     rax, rbx
+    push    rax
+    ;; -- end --
+    jmp     addr_12                     ;; Jump to while statement
+addr_21:
+    push    0
+    pop     rbx                         ;; Pop exit code into rbx
+    ;; -- syscall (1) 60: Exit --
+    mov     rax, 60
+    mov     rbx, rbx
+    syscall
 intrinsic_dump:
-	push    rbp
-	mov     rbp, rsp
-	sub     rsp, 64
-	mov     qword [rbp - 8], rdi
-	mov     qword [rbp - 56], 1
-	mov     eax, 32
-	sub     rax, qword [rbp - 56]
-	mov     byte [rbp + rax - 48], 10
+    push    rbp
+    mov     rbp, rsp
+    sub     rsp, 64
+    mov     qword [rbp - 8], rdi
+    mov     qword [rbp - 56], 1
+    mov     eax, 32
+    sub     rax, qword [rbp - 56]
+    mov     byte [rbp + rax - 48], 10
 .intrinsic_dump_body:
-	mov     rax, qword [rbp - 8]
-	mov     ecx, 10
-	xor     edx, edx
-	div     rcx
-	add     rdx, 48
-	mov     cl, dl
-	mov     eax, 32
-	sub     rax, qword [rbp - 56]
-	sub     rax, 1
-	mov     byte [rbp + rax - 48], cl
-	mov     rax, qword [rbp - 56]
-	add     rax, 1
-	mov     qword [rbp - 56], rax
-	mov     rax, qword [rbp - 8]
-	mov     ecx, 10
-	xor     edx, edx
-	div     rcx
-	mov     qword [rbp - 8], rax
-	cmp     qword [rbp - 8], 0
-	jne     .intrinsic_dump_body
-	mov     eax, 32
-	sub     rax, qword [rbp - 56]
-	lea     rsi, [rbp - 48]
-	add     rsi, rax
-	mov     rdx, qword [rbp - 56]
-	mov     edi, 1
-	mov     rax, 1
-	syscall
-	add     rsp, 64
-	pop     rbp
-	ret
+    mov     rax, qword [rbp - 8]
+    mov     ecx, 10
+    xor     edx, edx
+    div     rcx
+    add     rdx, 48
+    mov     cl, dl
+    mov     eax, 32
+    sub     rax, qword [rbp - 56]
+    sub     rax, 1
+    mov     byte [rbp + rax - 48], cl
+    mov     rax, qword [rbp - 56]
+    add     rax, 1
+    mov     qword [rbp - 56], rax
+    mov     rax, qword [rbp - 8]
+    mov     ecx, 10
+    xor     edx, edx
+    div     rcx
+    mov     qword [rbp - 8], rax
+    cmp     qword [rbp - 8], 0
+    jne     .intrinsic_dump_body
+    mov     eax, 32
+    sub     rax, qword [rbp - 56]
+    lea     rsi, [rbp - 48]
+    add     rsi, rax
+    mov     rdx, qword [rbp - 56]
+    mov     edi, 1
+    mov     rax, 1
+    syscall
+    add     rsp, 64
+    pop     rbp
+    ret 

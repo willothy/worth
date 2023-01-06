@@ -52,6 +52,9 @@ pub fn simulate(program: &Program) -> Result<(), String> {
                     stack.push(a);
                     stack.push(a);
                 }
+                Intrinsic::Mem => {
+                    todo!()
+                }
             },
             Instruction::Add => {
                 let a = stack.pop().unwrap();

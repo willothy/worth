@@ -87,7 +87,6 @@ fn expand_macros(program: &mut Program) {
 
     // Remove macro definitions
     for (name, macro_def) in macros {
-        println!("Defining macro {} at {:?}", name, macro_def.loc);
         let (start_ip, end_ip) = macro_def.loc;
         program.instructions.drain(start_ip..=end_ip);
         program.macros.insert(name, macro_def);
@@ -107,11 +106,13 @@ fn expand_macros(program: &mut Program) {
 
     // Expand macro uses
     for (_, macro_def) in &program.macros {
+        let mut ip_mod = 0;
         for use_ip in &macro_def.uses {
-            let use_ip = *use_ip;
+            let use_ip = *use_ip + ip_mod;
             program
                 .instructions
                 .splice(use_ip..=use_ip, macro_def.body.clone());
+            ip_mod += macro_def.body.len() - 1; // -1 because we removed the macro name
         }
     }
 }

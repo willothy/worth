@@ -71,7 +71,7 @@ pub enum Instruction {
     Name(String),
 }
 
-intrinsics!(Dump, Panic, Dup);
+intrinsics!(Dump, Panic, Dup, Mem);
 
 impl Display for Intrinsic {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

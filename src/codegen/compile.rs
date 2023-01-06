@@ -2,7 +2,7 @@ use super::intrinsics::gen_intrinsics;
 use super::ops;
 use crate::cli::{CompilerOptions, OutputType};
 use crate::instruction::*;
-use crate::{asm, comment, global, label, segment, sys_exit};
+use crate::{asm, asm_line, comment, global, label, segment, sys_exit, syscall};
 
 pub fn compile(program: &Program, opt: CompilerOptions) -> Result<(), Box<dyn std::error::Error>> {
     let mut asm = vec![];
@@ -22,7 +22,7 @@ pub fn compile(program: &Program, opt: CompilerOptions) -> Result<(), Box<dyn st
         match &inst {
             Instruction::Push(val) => match val {
                 Value::Int(i) => {
-                    asm!(asm, &format!("push    {}", i))
+                    asm!(asm, ("push", "{}", i))
                 }
                 Value::Char(_) => todo!(),
                 Value::Ptr(_) => todo!(),
@@ -40,26 +40,43 @@ pub fn compile(program: &Program, opt: CompilerOptions) -> Result<(), Box<dyn st
                 label!(asm, "addr_{}", self_ip);
             }
             Instruction::Do { end_ip } => {
-                asm!(asm, "pop     rax");
-                asm!(asm, "test    rax, rax", with "While loop condition");
-                asm!(asm, "jz      addr_{}", @end_ip, with "Jump to end of while loop");
+                asm!(
+                    asm,
+                    ("pop", "rax"),
+                    /// While loop condition
+                    ("test", "rax, rax"),
+                    /// Jump to end of while loop
+                    ("jz", "addr_{}", end_ip)
+                );
                 comment!(asm, "-- do --");
             }
             Instruction::If { else_ip } => {
                 comment!(asm, "-- if --");
-                asm!(asm, "pop     rax");
-                asm!(asm, "test    rax, rax");
-                asm!(asm, "jz      addr_{}", @else_ip, with "Jump to else statement");
+                asm!(
+                    asm,
+                    ("pop", "rax"),
+                    ("test", "rax, rax"),
+                    /// Jump to else statement
+                    ("jz", "addr_{}", else_ip)
+                );
             }
             Instruction::Else { else_ip, end_ip } => {
                 comment!(asm, "-- else --");
-                asm!(asm, "jmp     addr_{}", @end_ip, with "Jump to end of if statement");
+                asm!(
+                    asm,
+                    /// Jump to end of if statement
+                    ("jmp", "addr_{}", end_ip)
+                );
                 label!(asm, "addr_{}", else_ip);
             }
             Instruction::End { self_ip, while_ip } => {
                 comment!(asm, "-- end --");
                 if let Some(while_ip) = while_ip {
-                    asm!(asm, "jmp     addr_{}", @while_ip, with "Jump to while statement");
+                    asm!(
+                        asm,
+                        /// Jump to while statement
+                        ("jmp", "addr_{}", while_ip)
+                    )
                 }
                 label!(asm, "addr_{}", self_ip);
             }
@@ -85,7 +102,11 @@ pub fn compile(program: &Program, opt: CompilerOptions) -> Result<(), Box<dyn st
         }
     }
 
-    asm!(asm, "pop     rbx", with "Pop exit code into rbx");
+    asm!(
+        asm,
+        /// Pop exit code into rbx
+        ("pop", "rbx")
+    );
     sys_exit!(asm, "rbx");
 
     gen_intrinsics(&mut asm);
