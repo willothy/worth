@@ -154,7 +154,9 @@ pub fn compile(program: &Program, opt: CompilerOptions) -> Result<(), Box<dyn st
         .to_string_lossy()
         .to_string();
 
-    std::fs::write(asm_out_path, asm.join("\n"))?;
+    let Ok(_) = std::fs::write(asm_out_path, asm.join("\n")) else {
+        return Err(format!("Failed to write asm file").into())
+    };
 
     if matches!(output_type, OutputType::Asm) {
         return Ok(());
@@ -176,7 +178,10 @@ pub fn compile(program: &Program, opt: CompilerOptions) -> Result<(), Box<dyn st
         .args(&[&obj_out_path_str, "-o", &exe_out_path_str])
         .spawn()?
         .wait()?;
-    std::fs::remove_file(obj_out_path_str)?;
+    let Ok(_) = std::fs::remove_file(&obj_out_path_str) else {
+        println!("Warning: Could not remove object file {}", obj_out_path_str);
+        return Ok(());
+    };
 
     Ok(())
 }

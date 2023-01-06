@@ -15,7 +15,9 @@ mod sim;
 fn load_program(path: &PathBuf) -> Result<Program, Box<dyn std::error::Error>> {
     let name = path.clone().with_extension("");
     let name = name.file_name().unwrap().to_str().unwrap();
-    let source = std::fs::read_to_string(path)?;
+    let Ok(source) = std::fs::read_to_string(path) else {
+        return Err(format!("Could not read file {}", path.display()).into());
+    };
 
     let program = parser::parse(source, name)?;
     let program = preprocessor::process(program)?;
@@ -25,7 +27,7 @@ fn load_program(path: &PathBuf) -> Result<Program, Box<dyn std::error::Error>> {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Cli::parse();
 
-    let program = load_program(&args.file)?;
+    let program = load_program(&args.file.canonicalize().expect("Could not find file!"))?;
 
     match args.command {
         Commands::Compile(opt) => codegen::compile(&program, opt)?,

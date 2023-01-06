@@ -5,6 +5,10 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[[bin]]
+name = "worthc"
+path = "src/main.rs"
+
 [dependencies]
 casey = "0.3.3"
 clap = { version = "4.0.32", features = ["derive"] }
@@ -12,3 +16,7 @@ nom = "7.1.2"
 nom_locate = "4.0.0"
 strum = "0.24.1"
 strum_macros = "0.24.3"
+
+[dev-dependencies]
+serial_test = "0.10.0"
+test_bin = "0.4.0"
