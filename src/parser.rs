@@ -120,6 +120,13 @@ impl From<&str> for Instruction {
                 while_ip: None,
             },
             "macro" => Instruction::Macro,
+            "syscall0" => Instruction::Syscall0,
+            "syscall1" => Instruction::Syscall1,
+            "syscall2" => Instruction::Syscall2,
+            "syscall3" => Instruction::Syscall3,
+            "syscall4" => Instruction::Syscall4,
+            "syscall5" => Instruction::Syscall5,
+            "syscall6" => Instruction::Syscall6,
             name => {
                 if let Ok(intrinsic) = Intrinsic::from_str(name) {
                     Instruction::Intrinsic(intrinsic)

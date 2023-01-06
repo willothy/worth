@@ -1,8 +1,8 @@
 use super::intrinsics::gen_intrinsics;
 use super::ops;
 use crate::cli::{CompilerOptions, OutputType};
-use crate::instruction::*;
-use crate::{asm, asm_line, comment, global, label, segment, syscall};
+use crate::{asm, asm_line, comment, global, label, segment};
+use crate::{instruction::*, syscall};
 
 pub const MEM_CAPACITY: usize = 640_000;
 
@@ -105,6 +105,13 @@ pub fn compile(program: &Program, opt: CompilerOptions) -> Result<(), Box<dyn st
             Instruction::Gte => ops::gte(&mut asm),
             Instruction::Load => ops::load(&mut asm),
             Instruction::Store => ops::store(&mut asm),
+            Instruction::Syscall0 => ops::syscall0(&mut asm),
+            Instruction::Syscall1 => ops::syscall1(&mut asm),
+            Instruction::Syscall2 => ops::syscall2(&mut asm),
+            Instruction::Syscall3 => ops::syscall3(&mut asm),
+            Instruction::Syscall4 => ops::syscall4(&mut asm),
+            Instruction::Syscall5 => ops::syscall5(&mut asm),
+            Instruction::Syscall6 => ops::syscall6(&mut asm),
             Instruction::Macro => unreachable!("Macro should be expanded before codegen"),
             Instruction::Name(name) => {
                 unreachable!("Name {} should be expanded before codegen", name)
@@ -112,12 +119,7 @@ pub fn compile(program: &Program, opt: CompilerOptions) -> Result<(), Box<dyn st
         }
     }
 
-    asm!(
-        asm,
-        /// Pop exit code into rbx
-        ("pop", "rbx")
-    );
-    syscall!(asm, Exit, "rbx");
+    syscall!(asm, 60, 0);
 
     gen_intrinsics(&mut asm);
 

@@ -1,0 +1,19 @@
+// Args: len, char*
+macro print
+    1 1 syscall3
+end
+
+mem dup 72  .
+1 + dup 101 .
+1 + dup 108 .
+1 + dup 108 .
+1 + dup 111 .
+1 + dup 44  .
+1 + dup 32  .
+1 + dup 87  .
+1 + dup 111 .
+1 + dup 114 .
+1 + dup 108 .
+1 + dup 100 .
+1 + dup 10  .
+13 mem print

@@ -229,3 +229,94 @@ pub fn store(asm: &mut Vec<String>) {
         ("mov", "[rax], bl")
     );
 }
+
+pub fn syscall0(asm: &mut Vec<String>) {
+    comment!(asm, "-- syscall0 --");
+    asm!(
+        asm,
+        // Syscall number
+        ("pop", "rax"),
+        ("syscall")
+    );
+}
+
+pub fn syscall1(asm: &mut Vec<String>) {
+    comment!(asm, "-- syscall1 --");
+    asm!(
+        asm,
+        /// Syscall number
+        ("pop", "rax"),
+        ("pop", "rdi"),
+        ("syscall")
+    );
+}
+
+pub fn syscall2(asm: &mut Vec<String>) {
+    comment!(asm, "-- syscall2 --");
+    asm!(
+        asm,
+        /// Syscall number
+        ("pop", "rax"),
+        ("pop", "rdi"),
+        ("pop", "rsi"),
+        ("syscall")
+    );
+}
+
+pub fn syscall3(asm: &mut Vec<String>) {
+    comment!(asm, "-- syscall3 --");
+    asm!(
+        asm,
+        /// Syscall number
+        ("pop", "rax"),
+        ("pop", "rdi"),
+        ("pop", "rsi"),
+        ("pop", "rdx"),
+        ("syscall")
+    );
+}
+
+pub fn syscall4(asm: &mut Vec<String>) {
+    comment!(asm, "-- syscall4 --");
+    asm!(
+        asm,
+        /// Syscall number
+        ("pop", "rax"),
+        ("pop", "rdi"),
+        ("pop", "rsi"),
+        ("pop", "rdx"),
+        ("pop", "r10"),
+        ("syscall")
+    );
+}
+
+pub fn syscall5(asm: &mut Vec<String>) {
+    comment!(asm, "-- syscall5 --");
+    asm!(
+        asm,
+        /// Syscall number
+        ("pop", "rax"),
+        ("pop", "rdi"),
+        ("pop", "rsi"),
+        ("pop", "rdx"),
+        ("pop", "r10"),
+        ("pop", "r8"),
+        ("syscall")
+    );
+}
+
+pub fn syscall6(asm: &mut Vec<String>) {
+    comment!(asm, "-- syscall6 --");
+    asm!(
+        asm,
+        /// Syscall number
+        ("pop", "rax"),
+        ("pop", "rdi"),
+        ("pop", "rsi"),
+        ("pop", "rdx"),
+        ("pop", "r10"),
+        ("pop", "r8"),
+        ("pop", "r9"),
+        ("syscall")
+    );
+}

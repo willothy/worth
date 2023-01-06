@@ -69,4 +69,11 @@ pub enum Instruction {
     Name(String),
     Store,
     Load,
+    Syscall0,
+    Syscall1,
+    Syscall2,
+    Syscall3,
+    Syscall4,
+    Syscall5,
+    Syscall6,
 }

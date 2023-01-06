@@ -1,10 +1,6 @@
-use crate::{asm, asm_line, comment, intrinsics, label, sys_exit, syscall, syscalls};
+use crate::{asm, asm_line, comment, intrinsics, label, sys_exit, syscall};
 use std::fmt::Display;
 use strum_macros::{EnumString, IntoStaticStr};
-
-syscalls! {
-    Exit = 60
-}
 
 intrinsics!(Dump, Panic, Dup, Swap, Mem);
 
