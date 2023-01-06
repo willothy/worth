@@ -6,7 +6,7 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<(), String> 
         ..
     } = program;
     let mut stack = Vec::new();
-    let mut bss = vec![0; crate::codegen::MEM_CAPACITY];
+    let mut bss: Vec<u8> = vec![0; crate::codegen::MEM_CAPACITY];
     let debug = opt.debug;
 
     let mut ip = 0;
@@ -159,13 +159,13 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<(), String> 
                 unreachable!("Name {} should be expanded before simulation", name)
             }
             Instruction::Store => {
-                let val = stack.pop().unwrap();
+                let val = stack.pop().unwrap() % 0xFF;
                 let addr = stack.pop().unwrap();
-                bss[addr as usize] = val;
+                bss[addr as usize] = val as u8; // Take lower byte only
             }
             Instruction::Load => {
                 let a = stack.pop().unwrap();
-                stack.push(bss[a as usize]);
+                stack.push(bss[a as usize] as i64);
             }
             #[allow(unreachable_patterns)]
             instruction => todo!("Implement instruction {:?}", instruction),
