@@ -202,3 +202,30 @@ pub fn gte(asm: &mut Vec<String>) {
         ("push", "rcx")
     );
 }
+
+pub fn load(asm: &mut Vec<String>) {
+    comment!(asm, "-- load --");
+    asm!(
+        asm,
+        /// Address to load from
+        ("pop", "rax"),
+        /// Zero out rbx
+        ("xor", "rbx, rbx"),
+        /// Load low byte into rbx
+        ("mov", "bl, [rax]"),
+        ("push", "rbx")
+    );
+}
+
+pub fn store(asm: &mut Vec<String>) {
+    comment!(asm, "-- store --");
+    asm!(
+        asm,
+        /// Value to store
+        ("pop", "rbx"),
+        /// Address to store into
+        ("pop", "rax"),
+        /// Store low byte into address
+        ("mov", "[rax], bl")
+    );
+}

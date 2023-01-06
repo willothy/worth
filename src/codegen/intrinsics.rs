@@ -1,7 +1,18 @@
-use crate::{asm, asm_line, comment, label, sys_exit, syscall, syscalls};
+use crate::{asm, asm_line, comment, intrinsics, label, sys_exit, syscall, syscalls};
+use std::fmt::Display;
+use strum_macros::{EnumString, IntoStaticStr};
 
 syscalls! {
     Exit = 60
+}
+
+intrinsics!(Dump, Panic, Dup, Swap, Mem);
+
+impl Display for Intrinsic {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let intrinsic: &'static str = self.into();
+        write!(f, "{}", intrinsic)
+    }
 }
 
 pub fn panic(asm: &mut Vec<String>) {
@@ -21,8 +32,18 @@ pub fn dup(asm: &mut Vec<String>) {
     asm!(asm, ("pop", "rax"), ("push", "rax"), ("push", "rax"));
 }
 
+pub fn swap(asm: &mut Vec<String>) {
+    asm!(
+        asm,
+        ("pop", "rax"),
+        ("pop", "rbx"),
+        ("push", "rax"),
+        ("push", "rbx")
+    );
+}
+
 pub fn mem(asm: &mut Vec<String>) {
-    asm!(asm, ("pop", "rax"), ("push", "qword [rax]"));
+    asm!(asm, ("push", "mem"));
 }
 
 pub fn gen_intrinsics(asm: &mut Vec<String>) {

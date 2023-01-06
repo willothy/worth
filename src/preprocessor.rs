@@ -4,19 +4,20 @@ use crate::instruction::{Instruction, Macro, Program};
 
 pub fn process(mut program: Program) -> Result<Program, String> {
     expand_macros(&mut program);
+    //println!("Preprocessing program: {:#?}", program);
     resolve_jumps(&mut program);
     Ok(program)
 }
 
 fn expand_macros(program: &mut Program) {
-    let mut macro_stack = Vec::new();
     let mut macros = HashMap::new();
     let mut macro_body = Vec::new();
     let mut macro_name = String::new();
+    let mut macro_stack = Vec::new();
     let mut in_macro = false;
 
     // Collect macros
-    for (ip, instruction) in program.instructions.iter_mut().enumerate() {
+    for (ip, instruction) in program.instructions.iter().enumerate() {
         match instruction {
             Instruction::Macro => {
                 macro_stack.push(("macro", ip));
@@ -85,36 +86,69 @@ fn expand_macros(program: &mut Program) {
         }
     }
 
-    // Remove macro definitions
-    for (name, macro_def) in macros {
-        let (start_ip, end_ip) = macro_def.loc;
-        program.instructions.drain(start_ip..=end_ip);
-        program.macros.insert(name, macro_def);
-    }
-
-    // Resolve uses
-    for (ip, inst) in program.instructions.iter().enumerate() {
+    // Expand macros
+    let mut new_instructions = Vec::new();
+    macro_stack.clear();
+    in_macro = false;
+    for inst in program.instructions.iter() {
         match inst {
+            Instruction::Macro => {
+                macro_stack.push(("macro", 0));
+                in_macro = true;
+                continue;
+            }
             Instruction::Name(name) => {
-                if let Some(macro_def) = program.macros.get_mut(name) {
-                    macro_def.uses.push(ip);
+                if !in_macro {
+                    if let Some(macro_) = macros.get(name) {
+                        new_instructions.extend(macro_.body.clone());
+                        continue;
+                    }
+                }
+            }
+            Instruction::While { .. } => {
+                macro_stack.push(("while", 0));
+            }
+            Instruction::Do { .. } => {
+                assert!(macro_stack.pop().unwrap().0 == "while");
+                macro_stack.push(("do", 0));
+            }
+            Instruction::If { .. } => {
+                macro_stack.push(("while", 0));
+            }
+            Instruction::Else { .. } => {
+                assert!(macro_stack.pop().unwrap().0 == "if");
+                macro_stack.push(("else", 0));
+            }
+            Instruction::End { .. } => {
+                let (kind, _) = macro_stack.pop().unwrap();
+                assert!(
+                    kind == "macro"
+                        || kind == "if"
+                        || kind == "else"
+                        || kind == "while"
+                        || kind == "do"
+                );
+                match kind {
+                    "macro" => {
+                        if in_macro {
+                            in_macro = false;
+                            continue;
+                        }
+                    }
+                    "if" => {}
+                    "else" => {}
+                    "while" => {}
+                    "do" => {}
+                    _ => {}
                 }
             }
             _ => {}
         }
-    }
-
-    // Expand macro uses
-    for (_, macro_def) in &program.macros {
-        let mut ip_mod = 0;
-        for use_ip in &macro_def.uses {
-            let use_ip = *use_ip + ip_mod;
-            program
-                .instructions
-                .splice(use_ip..=use_ip, macro_def.body.clone());
-            ip_mod += macro_def.body.len() - 1; // -1 because we removed the macro name
+        if !in_macro {
+            new_instructions.push(inst.clone());
         }
     }
+    program.instructions = new_instructions;
 }
 
 fn resolve_jumps(program: &mut Program) {

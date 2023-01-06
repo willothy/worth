@@ -29,7 +29,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     match args.command {
         Commands::Compile(opt) => codegen::compile(&program, opt)?,
-        Commands::Simulate => sim::simulate(&program)?,
+        Commands::Simulate(opt) => sim::simulate(&program, opt)?,
     }
 
     Ok(())

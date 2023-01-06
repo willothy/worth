@@ -1,12 +1,26 @@
-macro test
-    while dup 0 <= do
-        dup .
-        1 -
-    end
+// Args (right is top): value, addr
+macro memset
+    mem swap + swap .
 end
 
-10
-    test
-15
-    test
+// Args: addr
+macro memread
+    mem + ,
+end
+
+0
+// add "abc" to memory
+97 0 memset
+98 1 memset
+99 2 memset
+
+// Set "abc" to "bcd"
+0 memread 1 + 0 memset
+1 memread 1 + 1 memset
+2 memread 1 + 2 memset
+
+0 memread dump
+1 memread dump
+2 memread dump
+
 0

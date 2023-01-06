@@ -1,15 +1,23 @@
-use crate::instruction::*;
+use crate::{cli::SimulatorOptions, codegen::intrinsics::Intrinsic, instruction::*};
 
-pub fn simulate(program: &Program) -> Result<(), String> {
+pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<(), String> {
     let Program {
         instructions: program,
         ..
     } = program;
     let mut stack = Vec::new();
+    let mut bss = vec![0; crate::codegen::MEM_CAPACITY];
+    let debug = opt.debug;
 
     let mut ip = 0;
     while ip < program.len() {
         let inst = &program[ip];
+        if debug {
+            println!("ip: {:?} inst: {:?}", ip, inst);
+            println!("stack: {:?}", stack);
+            println!("bss[0..10]: {:?}", &bss[0..10]);
+            println!("-------------------------------------------");
+        }
         match &inst {
             Instruction::While { .. } => {}
             Instruction::Do { end_ip } => {
@@ -52,9 +60,15 @@ pub fn simulate(program: &Program) -> Result<(), String> {
                     stack.push(a);
                     stack.push(a);
                 }
-                Intrinsic::Mem => {
-                    todo!()
+                Intrinsic::Mem => stack.push(0),
+                Intrinsic::Swap => {
+                    let a = stack.pop().unwrap();
+                    let b = stack.pop().unwrap();
+                    stack.push(a);
+                    stack.push(b);
                 }
+                #[allow(unreachable_patterns)]
+                intrinsic => todo!("Implement intrinsic {}", intrinsic),
             },
             Instruction::Add => {
                 let a = stack.pop().unwrap();
@@ -141,7 +155,20 @@ pub fn simulate(program: &Program) -> Result<(), String> {
                 stack.push((a >= b) as i64);
             }
             Instruction::Macro => unreachable!("Macro should be expanded before simulation"),
-            Instruction::Name(_) => unreachable!("Name should be expanded before simulation"),
+            Instruction::Name(name) => {
+                unreachable!("Name {} should be expanded before simulation", name)
+            }
+            Instruction::Store => {
+                let val = stack.pop().unwrap();
+                let addr = stack.pop().unwrap();
+                bss[addr as usize] = val;
+            }
+            Instruction::Load => {
+                let a = stack.pop().unwrap();
+                stack.push(bss[a as usize]);
+            }
+            #[allow(unreachable_patterns)]
+            instruction => todo!("Implement instruction {:?}", instruction),
         }
         ip += 1;
     }

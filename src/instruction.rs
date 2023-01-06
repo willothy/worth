@@ -1,8 +1,6 @@
-use std::{collections::HashMap, fmt::Display};
+use std::collections::HashMap;
 
-use strum_macros::{EnumString, IntoStaticStr};
-
-use crate::intrinsics;
+use crate::codegen::intrinsics::Intrinsic;
 
 #[derive(Debug, Clone)]
 pub struct Program {
@@ -69,13 +67,6 @@ pub enum Instruction {
     Gte,
     Macro,
     Name(String),
-}
-
-intrinsics!(Dump, Panic, Dup, Mem);
-
-impl Display for Intrinsic {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let intrinsic: &'static str = self.into();
-        write!(f, "{}", intrinsic)
-    }
+    Store,
+    Load,
 }

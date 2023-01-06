@@ -1,9 +1,14 @@
 use std::{collections::HashMap, error::Error, str::FromStr};
 
-use nom::{bytes::complete::take_while1, character::complete::multispace0, IResult};
+use nom::{
+    bytes::complete::take_while1, character::complete::multispace0, combinator::opt, IResult,
+};
 use nom_locate::LocatedSpan;
 
-use crate::instruction::{Instruction, Intrinsic, Program, Value};
+use crate::{
+    codegen::intrinsics::Intrinsic,
+    instruction::{Instruction, Program, Value},
+};
 
 type Span<'a> = LocatedSpan<&'a str>;
 
@@ -55,6 +60,9 @@ impl Parser {
 
     pub fn parse_instruction<'a>(&self, input: Span<'a>) -> IResult<Span<'a>, Token> {
         let (input, _) = multispace0(input)?;
+        //println!("1: {:?}", input.fragment());
+        let (input, _) = opt(Self::comment)(input)?;
+        //println!("2: {:?}", input.fragment());
         let (input, instruction) = take_while1(|c: char| !c.is_whitespace())(input)?;
         let (input, _) = multispace0(input)?;
         let token = Token {
@@ -62,6 +70,13 @@ impl Parser {
             location: (self.file.clone(), 0, 0),
         };
         Ok((input, token))
+    }
+
+    pub fn comment<'a>(input: Span<'a>) -> IResult<Span<'a>, Span<'a>> {
+        let (input, _) = nom::bytes::complete::tag("//")(input)?;
+        let (input, comment) = nom::bytes::complete::take_until("\n")(input)?;
+        let (input, _) = nom::bytes::complete::tag("\n")(input)?;
+        Ok((input, comment))
     }
 }
 
@@ -88,6 +103,8 @@ impl From<&str> for Instruction {
             ">" => Instruction::Gt,
             "<=" => Instruction::Lte,
             ">=" => Instruction::Gte,
+            "." => Instruction::Store,
+            "," => Instruction::Load,
             "while" => Instruction::While {
                 self_ip: 0,
                 do_ip: 0,
@@ -103,7 +120,6 @@ impl From<&str> for Instruction {
                 while_ip: None,
             },
             "macro" => Instruction::Macro,
-            "." => Instruction::Intrinsic(Intrinsic::Dump),
             name => {
                 if let Ok(intrinsic) = Intrinsic::from_str(name) {
                     Instruction::Intrinsic(intrinsic)

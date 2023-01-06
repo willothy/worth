@@ -14,13 +14,19 @@ pub enum Commands {
     #[clap(alias = "C")]
     Compile(CompilerOptions),
     #[clap(alias = "S")]
-    Simulate,
+    Simulate(SimulatorOptions),
 }
 
 #[derive(Debug, Parser)]
 pub struct CompilerOptions {
     #[clap(short, long)]
     pub output: Option<PathBuf>,
+}
+
+#[derive(Debug, Parser)]
+pub struct SimulatorOptions {
+    #[clap(short, long)]
+    pub debug: bool,
 }
 
 #[derive(Debug, Parser, Clone, ValueEnum)]
