@@ -113,6 +113,11 @@ impl Builder {
         self.const_str_counter - 1
     }
 
+    pub fn count_lines(&self) -> usize {
+        // + 3 for segment headers
+        self.bss.lines.len() + self.text.lines.len() + self.data.lines.len() + 3
+    }
+
     pub fn finalize(self) -> String {
         let mut output = String::new();
         output += "segment .bss\n";

@@ -1,6 +1,7 @@
 use std::io::{self, BufRead, BufReader, Write};
 
 use crate::error::{Error::RuntimeError, RuntimeError::*};
+use crate::log::{self, LogLevel::*};
 use crate::{cli::SimulatorOptions, codegen::intrinsics::Intrinsic, instruction::*};
 use anyhow::{Context, Result};
 
@@ -49,12 +50,18 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<()> {
             };
         }
         let inst = &program[ip];
-        if debug {
-            println!("ip: {:?} inst: {:?}", ip, inst);
-            println!("stack: {:?}", stack);
-            println!("bss[0..10]: {:?}", &bss[0..10]);
-            println!("-------------------------------------------");
-        }
+
+        log::log(
+            Debug,
+            format!(
+                "ip: {ip:?} inst: {inst:?}\n{}{stack:?}\n{}{:?}\n{}",
+                "stack: ",
+                "bss[0..10]: ",
+                &bss[0..10],
+                "-------------------------------------------"
+            ),
+            debug,
+        );
 
         match &inst {
             Instruction::Syscall(SyscallKind::Syscall0) => {
@@ -390,5 +397,6 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<()> {
         }
         ip += 1;
     }
+    log::log(Debug, "Sim exited successfully".into(), debug);
     Ok(())
 }

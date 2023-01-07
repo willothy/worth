@@ -24,8 +24,18 @@ pub enum Error {
     PreprocessorError(PreprocessorError),
     #[error("[Runtime Error] {0}")]
     RuntimeError(RuntimeError),
+    #[error("[Runner Error] {0}")]
+    RunnerError(RunnerError),
     #[error("[IO Error] {0}")]
     IOError(IOError),
+}
+
+#[derive(Error, Debug)]
+pub enum RunnerError {
+    #[error("Failed to invoke program: {0}")]
+    InvokeError(std::io::Error),
+    #[error("Program exited with non-zero status: {0}")]
+    NonZeroStatus(usize),
 }
 
 #[derive(Error, Debug)]

@@ -9,8 +9,10 @@ mod cli;
 mod codegen;
 mod error;
 mod instruction;
+mod log;
 mod parser;
 mod preprocessor;
+mod runner;
 mod sim;
 
 use anyhow::{Context, Result};
@@ -40,7 +42,16 @@ fn main() -> Result<()> {
     let program = load_program(&args.file.canonicalize().expect("Could not find file!"))?;
 
     match args.command {
-        Commands::Compile(opt) => codegen::compile(&program, opt)?,
+        Commands::Build(opt) => {
+            let compiled = codegen::compile(&program, opt)?;
+            log::log(log::LogLevel::Info, format!("Built {:?}", compiled), false);
+        }
+        Commands::Run(opt) => {
+            let compiled = codegen::compile(&program, opt.clone().into())?
+                .canonicalize()
+                .with_context(|| format!("Could not find compiled file for {:?}", &program.name))?;
+            runner::run(&compiled, opt)?;
+        }
         Commands::Simulate(opt) => sim::simulate(&program, opt)?,
     };
 
