@@ -64,7 +64,7 @@ pub fn not(asm: &mut Vec<String>) {
     asm!(asm, ("pop", "rax"), ("neg", "rax"), ("push", "rax"));
 }
 
-pub fn and(asm: &mut Vec<String>) {
+pub fn band(asm: &mut Vec<String>) {
     comment!(asm, "-- and --");
     asm!(
         asm,
@@ -75,7 +75,7 @@ pub fn and(asm: &mut Vec<String>) {
     );
 }
 
-pub fn or(asm: &mut Vec<String>) {
+pub fn bor(asm: &mut Vec<String>) {
     comment!(asm, "-- or --");
     asm!(
         asm,

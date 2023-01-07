@@ -2,9 +2,9 @@ use std::{collections::HashMap, error::Error, str::FromStr};
 
 use nom::{
     branch::alt,
-    bytes::complete::{tag, take_while1},
+    bytes::complete::take_while1,
     character::complete::{multispace0, multispace1},
-    combinator::{eof, opt},
+    combinator::eof,
     IResult,
 };
 use nom_locate::LocatedSpan;
@@ -25,7 +25,7 @@ pub struct Token {
 pub fn parse(source: String, name: &str) -> Result<Program, Box<dyn Error>> {
     let source = Span::new(&source);
     let parser = Parser {
-        file: name.to_string() + ".worth",
+        file: name.to_string() + ".porth",
     };
     let tokens = parser.parse_program(source);
 

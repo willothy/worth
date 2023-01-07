@@ -4,7 +4,7 @@ use serial_test::serial;
 
 fn runner(name: String) {
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests");
-    let file = dir.join("programs").join(&name).with_extension("worth");
+    let file = dir.join("programs").join(&name).with_extension("porth");
     let out_file = dir.join("tmp_test").with_extension("");
     println!("file: {:?}", file);
     let output = test_bin::get_test_bin("worthc")
@@ -33,12 +33,12 @@ fn runner(name: String) {
         .output()
         .expect("failed to execute process");
     // TODO: Fix the sim
-    /* assert_eq!(
+    assert_eq!(
         sim_output.status.success(),
         true,
         "Sim for {} exited with non-zero status",
         &name
-    ); */
+    );
 
     // assert!(sim_output.stdout == output.stdout);
     // assert!(sim_output.stderr == output.stderr);
