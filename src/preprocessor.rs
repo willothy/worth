@@ -1,14 +1,16 @@
 use std::collections::HashMap;
 
+use crate::error::{Error::PreprocessorError, PreprocessorError::*};
 use crate::instruction::{Instruction, Keyword, Macro, Program};
+use anyhow::{Context, Result};
 
-pub fn process(mut program: Program) -> Result<Program, String> {
-    expand_macros(&mut program);
-    resolve_jumps(&mut program);
+pub fn process(mut program: Program) -> Result<Program> {
+    expand_macros(&mut program)?;
+    resolve_jumps(&mut program)?;
     Ok(program)
 }
 
-fn expand_macros(program: &mut Program) {
+fn expand_macros(program: &mut Program) -> Result<()> {
     let mut macros = HashMap::new();
     let mut macro_body = Vec::new();
     let mut macro_name = String::new();
@@ -116,18 +118,24 @@ fn expand_macros(program: &mut Program) {
             }
             Instruction::Keyword(Keyword::Else { .. }) => {
                 let pred = macro_stack.pop().unwrap().0;
-                assert!(pred == "if", "Else without if");
+                if pred != "if" {
+                    return Err(PreprocessorError(UnexpectedKeyword))
+                        .with_context(|| format!("Else without if: found {}", pred));
+                }
                 macro_stack.push(("else", 0));
             }
             Instruction::Keyword(Keyword::End { .. }) => {
                 let (kind, _) = macro_stack.pop().unwrap();
-                assert!(
-                    kind == "macro"
-                        || kind == "if"
-                        || kind == "else"
-                        || kind == "while"
-                        || kind == "do"
-                );
+
+                if ["macro", "if", "else", "while", "do"]
+                    .iter()
+                    .find(|x| *x == &kind)
+                    .is_none()
+                {
+                    return Err(PreprocessorError(UnexpectedKeyword)).with_context(|| {
+                        format!("Unexpected keyword {} in macro expansion", kind)
+                    });
+                }
                 match kind {
                     "macro" => {
                         if in_macro {
@@ -149,9 +157,10 @@ fn expand_macros(program: &mut Program) {
         }
     }
     program.instructions = new_instructions;
+    Ok(())
 }
 
-fn resolve_jumps(program: &mut Program) {
+fn resolve_jumps(program: &mut Program) -> Result<()> {
     let mut jump_stack = Vec::new();
     for (ip, instruction) in program.instructions.iter_mut().enumerate() {
         match instruction {
@@ -160,7 +169,10 @@ fn resolve_jumps(program: &mut Program) {
             }
             Instruction::Keyword(Keyword::Else { else_ip, end_ip }) => {
                 let (kind, _, precursor_else_ip) = jump_stack.pop().unwrap();
-                assert_eq!(kind, "if");
+                if kind != "if" {
+                    return Err(PreprocessorError(UnexpectedKeyword))
+                        .with_context(|| format!("Else without if: found {} instead", kind));
+                }
                 *precursor_else_ip = ip;
                 *else_ip = ip;
                 jump_stack.push(("else", 0, end_ip));
@@ -170,7 +182,11 @@ fn resolve_jumps(program: &mut Program) {
                 while_ip: end_ip,
             }) => {
                 let (kind, while_ip, precursor_end_ip) = jump_stack.pop().unwrap();
-                assert!(kind == "if" || kind == "else" || kind == "do");
+                if kind != "if" && kind != "else" && kind != "do" {
+                    return Err(PreprocessorError(UnexpectedKeyword)).with_context(|| {
+                        format!("End without if/else/do: found {} instead", kind)
+                    });
+                }
                 *precursor_end_ip = ip;
                 *self_ip = ip;
                 if kind == "do" {
@@ -183,11 +199,15 @@ fn resolve_jumps(program: &mut Program) {
             }
             Instruction::Keyword(Keyword::Do { end_ip }) => {
                 let (kind, while_ip, precursor_do_ip) = jump_stack.pop().unwrap();
-                assert_eq!(kind, "while");
+                if kind != "while" {
+                    return Err(PreprocessorError(UnexpectedKeyword))
+                        .with_context(|| format!("Do without while: found {} instead", kind));
+                }
                 *precursor_do_ip = ip;
                 jump_stack.push(("do", while_ip, end_ip));
             }
             _ => {}
         }
     }
+    Ok(())
 }

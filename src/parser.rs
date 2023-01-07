@@ -1,5 +1,11 @@
 use std::collections::HashMap;
 
+use crate::{
+    codegen::intrinsics::Intrinsic,
+    error::{Error::ParseError, ParseError::*},
+    instruction::{self, Instruction, Keyword, Op, Program, Value},
+};
+use anyhow::{anyhow, Context, Result};
 use nom::{
     branch::alt,
     bytes::complete::tag,
@@ -11,11 +17,6 @@ use nom::{
     IResult,
 };
 use nom_locate::LocatedSpan;
-
-use crate::{
-    codegen::intrinsics::Intrinsic,
-    instruction::{self, Instruction, Keyword, Op, Program, Value},
-};
 
 pub type Span<'a> = LocatedSpan<&'a str, &'a str>;
 
@@ -38,7 +39,7 @@ pub enum TokenType {
     Empty,
 }
 
-pub fn parse(source: String, name: &str) -> Result<Program, String> {
+pub fn parse(source: String, name: &str) -> Result<Program> {
     let source = Span::new_extra(source.as_str(), name);
     let tokens = parse_program(source)?;
 
@@ -61,18 +62,18 @@ pub fn parse(source: String, name: &str) -> Result<Program, String> {
                         4 => instruction::SyscallKind::Syscall4,
                         5 => instruction::SyscallKind::Syscall5,
                         6 => instruction::SyscallKind::Syscall6,
-                        _ => return Err(format!("Syscall number {} is out of range (0-6)", n)),
+                        _ => return Err(anyhow!("Syscall number {} is out of range (0-6)", n)),
                     }),
                     TokenType::Comment => unreachable!("Comment should be filtered out"),
                     TokenType::Empty => unreachable!("Empty should be filtered out"),
                 })
             })
-            .collect::<Result<Vec<_>, String>>()?,
+            .collect::<Result<Vec<_>>>()?,
         macros: HashMap::new(),
     })
 }
 
-pub fn parse_program<'a>(input: Span<'a>) -> Result<Vec<Token>, String> {
+pub fn parse_program<'a>(input: Span<'a>) -> Result<Vec<Token>> {
     let mut input = input;
     let mut tokens = Vec::new();
     while let Ok((rem, token)) = alt((
@@ -91,10 +92,8 @@ pub fn parse_program<'a>(input: Span<'a>) -> Result<Vec<Token>, String> {
     }
 
     if !input.fragment().is_empty() {
-        return Err(format!(
-            "Failed to parse program:\nRemaining fragment: {}",
-            input.fragment()
-        ));
+        return Err(ParseError(Incomplete))
+            .with_context(|| format!("Remaining input: {}", input.fragment()));
     }
 
     tokens = tokens

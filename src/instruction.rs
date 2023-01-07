@@ -1,6 +1,11 @@
 use std::collections::HashMap;
 
-use crate::codegen::intrinsics::Intrinsic;
+use crate::{
+    codegen::intrinsics::Intrinsic,
+    error::{Error::ParseError, ParseError::*},
+};
+
+use anyhow::{Context, Result};
 
 #[derive(Debug, Clone)]
 pub struct Program {
@@ -50,7 +55,7 @@ pub enum Op {
 }
 
 impl Op {
-    pub(crate) fn from_str(value: &str) -> Result<Self, String> {
+    pub(crate) fn from_str(value: &str) -> Result<Self> {
         match value {
             "+" => Ok(Op::Add),
             "-" => Ok(Op::Sub),
@@ -71,7 +76,8 @@ impl Op {
             ">=" => Ok(Op::Gte),
             "." => Ok(Op::Store),
             "," => Ok(Op::Load),
-            op => Err(format!("Unknown operator {}", op)),
+            op => Err(ParseError(UnknownOperator))
+                .with_context(|| format!("Unknown operator: {}", op)),
         }
     }
 }
@@ -100,7 +106,7 @@ pub enum Keyword {
 }
 
 impl Keyword {
-    pub(crate) fn from_str(value: &str) -> Result<Self, String> {
+    pub(crate) fn from_str(value: &str) -> Result<Self> {
         match value {
             "while" => Ok(Keyword::While {
                 self_ip: 0,
@@ -117,7 +123,9 @@ impl Keyword {
                 while_ip: None,
             }),
             "macro" => Ok(Keyword::Macro),
-            _ => Err(format!("Unknown keyword: {}", value)),
+            kw => {
+                Err(ParseError(UnknownKeyword)).with_context(|| format!("Unknown keyword: {}", kw))
+            }
         }
     }
 }

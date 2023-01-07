@@ -14,12 +14,14 @@ name = "worthc_macros"
 path = "src/codegen/macros.rs"
 
 [dependencies]
+anyhow = "1.0.68"
 casey = "0.3.3"
 clap = { version = "4.0.32", features = ["derive"] }
 nom = "7.1.2"
 nom_locate = "4.0.0"
 strum = "0.24.1"
 strum_macros = "0.24.3"
+thiserror = "1.0.38"
 
 [dev-dependencies]
 serial_test = "0.10.0"
