@@ -197,9 +197,14 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<(), String> 
                     stack.pop();
                     stack.pop();
                 }
-                /* Intrinsic::Dup2 => {
-
-                } */
+                Intrinsic::Dup2 => {
+                    let a = stack.pop().unwrap();
+                    let b = stack.pop().unwrap();
+                    stack.push(b);
+                    stack.push(a);
+                    stack.push(b);
+                    stack.push(a);
+                }
                 #[allow(unreachable_patterns)]
                 intrinsic => todo!("Implement intrinsic {}", intrinsic),
             },

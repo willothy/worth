@@ -42,8 +42,10 @@ pub fn dup(asm: &mut Vec<String>) {
 pub fn dup2(asm: &mut Vec<String>) {
     asm!(
         asm,
+        ///( x1 x2 -> x1 x2 x1 x2 )
         ("pop", "rax"),
         ("pop", "rbx"),
+        ("push", "rbx"),
         ("push", "rax"),
         ("push", "rbx"),
         ("push", "rax")
