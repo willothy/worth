@@ -45,10 +45,8 @@ fn runner(name: String) {
     assert!(sim_output.stdout == output.stdout);
     assert!(sim_output.stderr == output.stderr);
 
-    // Remove the tmp_test and tmp_test.asm files
+    // Remove the tmp_test file
     std::fs::remove_file(&out_file).expect("Could not remove tmp_test file");
-    std::fs::remove_file(out_file.with_extension("asm"))
-        .expect("Could not remove tmp_test.asm file");
 }
 
 #[test]
@@ -73,4 +71,10 @@ fn bitwise() {
 #[serial]
 fn rule110() {
     runner("rule110".to_string());
+}
+
+#[test]
+#[serial]
+fn string() {
+    runner("string".to_string());
 }

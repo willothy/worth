@@ -21,6 +21,10 @@ pub enum Commands {
 pub struct CompilerOptions {
     #[clap(short, long)]
     pub output: Option<PathBuf>,
+    #[clap(short = 'k', long)]
+    pub keep_asm: bool,
+    #[clap(short = 'K', long)]
+    pub keep_obj: bool,
 }
 
 #[derive(Debug, Parser)]

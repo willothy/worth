@@ -96,6 +96,16 @@ macro_rules! intrinsics {
                     $($s => casey::lower!($s)),*
                 }
             }
+
+            pub fn from_str(s: &str) -> Result<Self, String> {
+                use Intrinsic::*;
+                match s {
+                    $(intrinsic_str!(lower!, $s$(, $val)?) => Ok($s),)*
+                    _ => {
+                        Err(format!("Intrinsic '{}' not found", s))
+                    }
+                }
+            }
         }
 
         impl From<&Intrinsic> for &str {
@@ -103,21 +113,6 @@ macro_rules! intrinsics {
                 use Intrinsic::*;
                 match i {
                     $($s => intrinsic_str!(lower!, $s$(, $val)?)),*
-                }
-            }
-        }
-
-        impl FromStr for Intrinsic {
-            type Err = ();
-
-            fn from_str(s: &str) -> Result<Self, Self::Err> {
-                use Intrinsic::*;
-                match s {
-                    $(intrinsic_str!(lower!, $s$(, $val)?) => Ok($s),)*
-                    _ => {
-                        //println!("Unknown intrinsic: {}", s);
-                        Err(())
-                    }
                 }
             }
         }

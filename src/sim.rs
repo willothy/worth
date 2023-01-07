@@ -43,13 +43,13 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<(), String> 
         }
 
         match &inst {
-            Instruction::Syscall0 => {
+            Instruction::Syscall(SyscallKind::Syscall0) => {
                 let syscall = stack.pop().unwrap();
                 match syscall {
                     number => todo!("Implement syscall0 {}", number),
                 }
             }
-            Instruction::Syscall1 => {
+            Instruction::Syscall(SyscallKind::Syscall1) => {
                 let syscall = stack.pop().unwrap();
                 let arg1 = stack.pop().unwrap();
                 match syscall {
@@ -65,7 +65,7 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<(), String> 
                 }
             }
             #[allow(unused_variables)]
-            Instruction::Syscall2 => {
+            Instruction::Syscall(SyscallKind::Syscall2) => {
                 let syscall = stack.pop().unwrap();
                 let arg1 = stack.pop().unwrap();
                 let arg2 = stack.pop().unwrap();
@@ -73,7 +73,7 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<(), String> 
                     number => todo!("Implement syscall2 {}", number),
                 }
             }
-            Instruction::Syscall3 => {
+            Instruction::Syscall(SyscallKind::Syscall3) => {
                 let syscall = stack.pop().unwrap();
                 let arg1 = stack.pop().unwrap();
                 let arg2 = stack.pop().unwrap();
@@ -100,7 +100,7 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<(), String> 
                 }
             }
             #[allow(unused_variables)]
-            Instruction::Syscall4 => {
+            Instruction::Syscall(SyscallKind::Syscall4) => {
                 let syscall = stack.pop().unwrap();
                 let arg1 = stack.pop().unwrap();
                 let arg2 = stack.pop().unwrap();
@@ -111,7 +111,7 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<(), String> 
                 }
             }
             #[allow(unused_variables)]
-            Instruction::Syscall5 => {
+            Instruction::Syscall(SyscallKind::Syscall5) => {
                 let syscall = stack.pop().unwrap();
                 let arg1 = stack.pop().unwrap();
                 let arg2 = stack.pop().unwrap();
@@ -123,7 +123,7 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<(), String> 
                 }
             }
             #[allow(unused_variables)]
-            Instruction::Syscall6 => {
+            Instruction::Syscall(SyscallKind::Syscall6) => {
                 let syscall = stack.pop().unwrap();
                 let arg1 = stack.pop().unwrap();
                 let arg2 = stack.pop().unwrap();
@@ -135,26 +135,26 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<(), String> 
                     number => todo!("Implement syscall6 {}", number),
                 }
             }
-            Instruction::While { .. } => {}
-            Instruction::Do { end_ip } => {
+            Instruction::Keyword(Keyword::While { .. }) => {}
+            Instruction::Keyword(Keyword::Do { end_ip }) => {
                 let a = stack.pop().unwrap();
                 if a == 0 {
                     ip = *end_ip + 1;
                     continue;
                 }
             }
-            Instruction::If { else_ip } => {
+            Instruction::Keyword(Keyword::If { else_ip }) => {
                 let a = stack.pop().unwrap();
                 if a == 0 {
                     ip = *else_ip + 1;
                     continue;
                 }
             }
-            Instruction::Else { end_ip, .. } => {
+            Instruction::Keyword(Keyword::Else { end_ip, .. }) => {
                 ip = *end_ip;
                 continue;
             }
-            Instruction::End { while_ip, .. } => {
+            Instruction::Keyword(Keyword::End { while_ip, .. }) => {
                 if let Some(while_ip) = while_ip {
                     ip = *while_ip;
                     continue;
@@ -208,103 +208,106 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<(), String> 
                 #[allow(unreachable_patterns)]
                 intrinsic => todo!("Implement intrinsic {}", intrinsic),
             },
-            Instruction::Add => {
+            Instruction::Op(Op::Add) => {
                 let a = stack.pop().unwrap();
                 let b = stack.pop().unwrap();
                 stack.push(a + b);
             }
-            Instruction::Sub => {
+            Instruction::Op(Op::Sub) => {
                 let a = stack.pop().unwrap();
                 let b = stack.pop().unwrap();
                 stack.push(b - a);
             }
-            Instruction::Mul => {
+            Instruction::Op(Op::Mul) => {
                 let a = stack.pop().unwrap();
                 let b = stack.pop().unwrap();
                 stack.push(a * b);
             }
-            Instruction::Div => {
+            Instruction::Op(Op::Div) => {
                 let a = stack.pop().unwrap();
                 let b = stack.pop().unwrap();
                 stack.push(b / a);
             }
-            Instruction::Mod => {
+            Instruction::Op(Op::Mod) => {
                 let a = stack.pop().unwrap();
                 let b = stack.pop().unwrap();
                 stack.push(a % b);
             }
-            Instruction::BitwiseAnd => {
+            Instruction::Op(Op::BitwiseAnd) => {
                 let a = stack.pop().unwrap();
                 let b = stack.pop().unwrap();
                 stack.push(a & b);
             }
-            Instruction::BitwiseOr => {
+            Instruction::Op(Op::BitwiseOr) => {
                 let a = stack.pop().unwrap();
                 let b = stack.pop().unwrap();
                 stack.push(a | b);
             }
-            Instruction::BitwiseXor => {
+            Instruction::Op(Op::BitwiseXor) => {
                 let a = stack.pop().unwrap();
                 let b = stack.pop().unwrap();
                 stack.push(a ^ b);
             }
-            Instruction::BitwiseNot => {
+            Instruction::Op(Op::BitwiseNot) => {
                 let a = stack.pop().unwrap();
                 stack.push(!a);
             }
-            Instruction::Shl => {
+            Instruction::Op(Op::Shl) => {
                 let a = stack.pop().unwrap();
                 let b = stack.pop().unwrap();
                 stack.push(b << a);
             }
-            Instruction::Shr => {
+            Instruction::Op(Op::Shr) => {
                 let a = stack.pop().unwrap();
                 let b = stack.pop().unwrap();
                 stack.push(b >> a);
             }
-            Instruction::Eq => {
+            Instruction::Op(Op::Eq) => {
                 let a = stack.pop().unwrap();
                 let b = stack.pop().unwrap();
                 stack.push((a == b) as i64);
             }
-            Instruction::Neq => {
+            Instruction::Op(Op::Neq) => {
                 let a = stack.pop().unwrap();
                 let b = stack.pop().unwrap();
                 stack.push((a != b) as i64);
             }
-            Instruction::Lt => {
+            Instruction::Op(Op::Lt) => {
                 let a = stack.pop().unwrap();
                 let b = stack.pop().unwrap();
                 stack.push((b < a) as i64);
             }
-            Instruction::Gt => {
+            Instruction::Op(Op::Gt) => {
                 let a = stack.pop().unwrap();
                 let b = stack.pop().unwrap();
                 stack.push((b > a) as i64);
             }
-            Instruction::Lte => {
+            Instruction::Op(Op::Lte) => {
                 let a = stack.pop().unwrap();
                 let b = stack.pop().unwrap();
                 stack.push((b <= a) as i64);
             }
-            Instruction::Gte => {
+            Instruction::Op(Op::Gte) => {
                 let a = stack.pop().unwrap();
                 let b = stack.pop().unwrap();
                 stack.push((b >= a) as i64);
             }
-            Instruction::Macro => unreachable!("Macro should be expanded before simulation"),
-            Instruction::Name(name) => {
-                unreachable!("Name {} should be expanded before simulation", name)
-            }
-            Instruction::Store => {
+            Instruction::Op(Op::Store) => {
                 let val = stack.pop().unwrap() % 0xFF;
                 let addr = stack.pop().unwrap();
                 bss[addr as usize] = val as u8; // Take lower byte only
             }
-            Instruction::Load => {
+            Instruction::Op(Op::Load) => {
                 let a = stack.pop().unwrap();
                 stack.push(bss[a as usize] as i64);
             }
+            Instruction::Keyword(Keyword::Macro) => {
+                unreachable!("Macro should be expanded before simulation")
+            }
+            Instruction::Name(name) => {
+                unreachable!("Name {} should be expanded before simulation", name)
+            }
+
             #[allow(unreachable_patterns)]
             instruction => todo!("Implement instruction {:?}", instruction),
         }

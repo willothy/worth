@@ -41,11 +41,11 @@ pub fn compile(program: &Program, opt: CompilerOptions) -> Result<(), Box<dyn st
                 intrinsic.compile()(&mut asm);
                 comment!(asm, "-- end intrinsic --");
             }
-            Instruction::While { self_ip, .. } => {
+            Instruction::Keyword(Keyword::While { self_ip, .. }) => {
                 comment!(asm, "-- while --");
                 label!(asm, "addr_{}", self_ip);
             }
-            Instruction::Do { end_ip } => {
+            Instruction::Keyword(Keyword::Do { end_ip }) => {
                 asm!(
                     asm,
                     ("pop", "rax"),
@@ -56,7 +56,7 @@ pub fn compile(program: &Program, opt: CompilerOptions) -> Result<(), Box<dyn st
                 );
                 comment!(asm, "-- do --");
             }
-            Instruction::If { else_ip } => {
+            Instruction::Keyword(Keyword::If { else_ip }) => {
                 comment!(asm, "-- if --");
                 asm!(
                     asm,
@@ -66,7 +66,7 @@ pub fn compile(program: &Program, opt: CompilerOptions) -> Result<(), Box<dyn st
                     ("jz", "addr_{}", else_ip)
                 );
             }
-            Instruction::Else { else_ip, end_ip } => {
+            Instruction::Keyword(Keyword::Else { else_ip, end_ip }) => {
                 comment!(asm, "-- else --");
                 asm!(
                     asm,
@@ -75,7 +75,7 @@ pub fn compile(program: &Program, opt: CompilerOptions) -> Result<(), Box<dyn st
                 );
                 label!(asm, "addr_{}", else_ip);
             }
-            Instruction::End { self_ip, while_ip } => {
+            Instruction::Keyword(Keyword::End { self_ip, while_ip }) => {
                 comment!(asm, "-- end --");
                 if let Some(while_ip) = while_ip {
                     asm!(
@@ -86,33 +86,35 @@ pub fn compile(program: &Program, opt: CompilerOptions) -> Result<(), Box<dyn st
                 }
                 label!(asm, "addr_{}", self_ip);
             }
-            Instruction::Add => ops::add(&mut asm),
-            Instruction::Sub => ops::sub(&mut asm),
-            Instruction::Mul => ops::mul(&mut asm),
-            Instruction::Div => ops::div(&mut asm),
-            Instruction::Mod => ops::rem(&mut asm),
-            Instruction::BitwiseAnd => ops::band(&mut asm),
-            Instruction::BitwiseOr => ops::bor(&mut asm),
-            Instruction::BitwiseXor => ops::xor(&mut asm),
-            Instruction::BitwiseNot => ops::not(&mut asm),
-            Instruction::Shl => ops::shl(&mut asm),
-            Instruction::Shr => ops::shr(&mut asm),
-            Instruction::Eq => ops::eq(&mut asm),
-            Instruction::Neq => ops::neq(&mut asm),
-            Instruction::Lt => ops::lt(&mut asm),
-            Instruction::Gt => ops::gt(&mut asm),
-            Instruction::Lte => ops::lte(&mut asm),
-            Instruction::Gte => ops::gte(&mut asm),
-            Instruction::Load => ops::load(&mut asm),
-            Instruction::Store => ops::store(&mut asm),
-            Instruction::Syscall0 => ops::syscall0(&mut asm),
-            Instruction::Syscall1 => ops::syscall1(&mut asm),
-            Instruction::Syscall2 => ops::syscall2(&mut asm),
-            Instruction::Syscall3 => ops::syscall3(&mut asm),
-            Instruction::Syscall4 => ops::syscall4(&mut asm),
-            Instruction::Syscall5 => ops::syscall5(&mut asm),
-            Instruction::Syscall6 => ops::syscall6(&mut asm),
-            Instruction::Macro => unreachable!("Macro should be expanded before codegen"),
+            Instruction::Op(Op::Add) => ops::add(&mut asm),
+            Instruction::Op(Op::Sub) => ops::sub(&mut asm),
+            Instruction::Op(Op::Mul) => ops::mul(&mut asm),
+            Instruction::Op(Op::Div) => ops::div(&mut asm),
+            Instruction::Op(Op::Mod) => ops::rem(&mut asm),
+            Instruction::Op(Op::BitwiseAnd) => ops::band(&mut asm),
+            Instruction::Op(Op::BitwiseOr) => ops::bor(&mut asm),
+            Instruction::Op(Op::BitwiseXor) => ops::xor(&mut asm),
+            Instruction::Op(Op::BitwiseNot) => ops::not(&mut asm),
+            Instruction::Op(Op::Shl) => ops::shl(&mut asm),
+            Instruction::Op(Op::Shr) => ops::shr(&mut asm),
+            Instruction::Op(Op::Eq) => ops::eq(&mut asm),
+            Instruction::Op(Op::Neq) => ops::neq(&mut asm),
+            Instruction::Op(Op::Lt) => ops::lt(&mut asm),
+            Instruction::Op(Op::Gt) => ops::gt(&mut asm),
+            Instruction::Op(Op::Lte) => ops::lte(&mut asm),
+            Instruction::Op(Op::Gte) => ops::gte(&mut asm),
+            Instruction::Op(Op::Load) => ops::load(&mut asm),
+            Instruction::Op(Op::Store) => ops::store(&mut asm),
+            Instruction::Syscall(SyscallKind::Syscall0) => ops::syscall0(&mut asm),
+            Instruction::Syscall(SyscallKind::Syscall1) => ops::syscall1(&mut asm),
+            Instruction::Syscall(SyscallKind::Syscall2) => ops::syscall2(&mut asm),
+            Instruction::Syscall(SyscallKind::Syscall3) => ops::syscall3(&mut asm),
+            Instruction::Syscall(SyscallKind::Syscall4) => ops::syscall4(&mut asm),
+            Instruction::Syscall(SyscallKind::Syscall5) => ops::syscall5(&mut asm),
+            Instruction::Syscall(SyscallKind::Syscall6) => ops::syscall6(&mut asm),
+            Instruction::Keyword(Keyword::Macro) => {
+                unreachable!("Macro should be expanded before codegen")
+            }
             Instruction::Name(name) => {
                 unreachable!("Name {} should be expanded before codegen", name)
             }
@@ -167,7 +169,12 @@ pub fn compile(program: &Program, opt: CompilerOptions) -> Result<(), Box<dyn st
         .args(&[&asm_out_path_str, "-f", "elf64", "-o", &obj_out_path_str])
         .spawn()?
         .wait()?;
-    //std::fs::remove_file(asm_out_path_str)?;
+    if !opt.keep_asm {
+        let Ok(_) = std::fs::remove_file(&asm_out_path_str) else {
+            println!("Warning: Could not remove asm file {}", asm_out_path_str);
+            return Ok(());
+        };
+    }
 
     if matches!(output_type, OutputType::Obj) {
         return Ok(());
@@ -178,10 +185,12 @@ pub fn compile(program: &Program, opt: CompilerOptions) -> Result<(), Box<dyn st
         .args(&[&obj_out_path_str, "-o", &exe_out_path_str])
         .spawn()?
         .wait()?;
-    let Ok(_) = std::fs::remove_file(&obj_out_path_str) else {
-        println!("Warning: Could not remove object file {}", obj_out_path_str);
-        return Ok(());
-    };
+    if !opt.keep_obj {
+        let Ok(_) = std::fs::remove_file(&obj_out_path_str) else {
+            println!("Warning: Could not remove object file {}", obj_out_path_str);
+            return Ok(());
+        };
+    }
 
     Ok(())
 }
