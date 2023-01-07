@@ -1,3 +1,6 @@
+#![feature(trace_macros)]
+//trace_macros!(true);
+
 use std::path::PathBuf;
 
 use clap::Parser;

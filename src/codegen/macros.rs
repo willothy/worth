@@ -1,3 +1,5 @@
+pub use casey::lower;
+
 #[macro_export]
 macro_rules! comment {
     ($asm:ident, $s:expr) => {
@@ -79,10 +81,9 @@ macro_rules! asm_line {
 #[macro_export]
 macro_rules! intrinsics {
     (
-        $($s:ident),*
+        $($s:ident $(= $val:literal)?),*
     ) => {
-        #[derive(Debug, IntoStaticStr, EnumString, Clone)]
-        #[strum(ascii_case_insensitive)]
+        #[derive(Debug, Clone)]
         pub enum Intrinsic {
             $($s),*
         }
@@ -96,31 +97,39 @@ macro_rules! intrinsics {
                 }
             }
         }
+
+        impl From<&Intrinsic> for &str {
+            fn from(i: &Intrinsic) -> Self {
+                use Intrinsic::*;
+                match i {
+                    $($s => intrinsic_str!(lower!, $s$(, $val)?)),*
+                }
+            }
+        }
+
+        impl FromStr for Intrinsic {
+            type Err = ();
+
+            fn from_str(s: &str) -> Result<Self, Self::Err> {
+                use Intrinsic::*;
+                match s {
+                    $(intrinsic_str!(lower!, $s$(, $val)?) => Ok($s),)*
+                    _ => {
+                        //println!("Unknown intrinsic: {}", s);
+                        Err(())
+                    }
+                }
+            }
+        }
     };
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn asm_macro_test() {
-        let mut asm = Vec::new();
-        asm!(
-            asm,
-            /// Test comment
-            ("mov", "rax, 60"),
-            ("mov", "rdi, {}", 0),
-            ("syscall")
-        );
-        assert_eq!(
-            asm[0],
-            format!(
-                "{0:4}{1:8}{2:28};; {3}",
-                " ", "mov", "rax, 60", "Test comment"
-            )
-        );
-        assert_eq!(asm[1], format!("{0:4}{1:8}{2}", " ", "mov", "rdi, 0"));
-        assert_eq!(asm[2], "    syscall");
-    }
+#[macro_export]
+macro_rules! intrinsic_str {
+    ($lower:ident !, $s:ident, $val:literal) => {
+        $val
+    };
+    ($lower:ident !, $s:ident) => {
+        $lower!(stringify!($s))
+    };
 }

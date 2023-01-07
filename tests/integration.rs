@@ -16,7 +16,8 @@ fn runner(name: String) {
     assert_eq!(
         output.status.success(),
         true,
-        "Compiler exited with non-zero status for program"
+        "\n\n---- Compiler Error ----\nCompiler exited with non-zero status for program:\n\n{}\n-- End Compiler Error --\n\n",
+        unsafe { String::from_utf8_unchecked(output.stderr) }
     );
     let output = Command::new(&out_file)
         .output()
@@ -24,8 +25,9 @@ fn runner(name: String) {
     assert_eq!(
         output.status.success(),
         true,
-        "Program {} exited with non-zero status",
-        &name
+        "\n\n------ Test Error ------\nProgram {} exited with non-zero status:\n\n{}\n---- End Test Error ----\n",
+        &name,
+        unsafe { String::from_utf8_unchecked(output.stderr) }
     );
     let sim_output = test_bin::get_test_bin("worthc")
         .arg(file)
@@ -35,8 +37,9 @@ fn runner(name: String) {
     assert_eq!(
         sim_output.status.success(),
         true,
-        "Sim for {} exited with non-zero status",
-        &name
+        "\n\n------- Sim Error ------\nSim for {} exited with non-zero status:\n\n{}\n----- End Sim Error ----\n",
+        &name,
+        unsafe { String::from_utf8_unchecked(sim_output.stderr) }
     );
 
     assert!(sim_output.stdout == output.stdout);

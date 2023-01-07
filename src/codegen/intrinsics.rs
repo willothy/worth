@@ -1,12 +1,23 @@
-use crate::{asm, asm_line, comment, intrinsics, label, sys_exit, syscall};
+use crate::{asm, asm_line, comment, intrinsic_str, intrinsics, label, sys_exit, syscall};
+use casey::lower;
 use std::fmt::Display;
-use strum_macros::{EnumString, IntoStaticStr};
+use std::str::FromStr;
 
-intrinsics!(Dump, Panic, Dup, Swap, Mem, Drop);
+intrinsics!(
+    Dump,
+    Panic,
+    Dup,
+    Dup2 = "2dup",
+    Swap,
+    Mem,
+    Drop,
+    Drop2 = "2drop",
+    Over
+);
 
 impl Display for Intrinsic {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let intrinsic: &'static str = self.into();
+        let intrinsic: &str = self.into();
         write!(f, "{}", intrinsic)
     }
 }
@@ -28,8 +39,34 @@ pub fn dup(asm: &mut Vec<String>) {
     asm!(asm, ("pop", "rax"), ("push", "rax"), ("push", "rax"));
 }
 
+pub fn dup2(asm: &mut Vec<String>) {
+    asm!(
+        asm,
+        ("pop", "rax"),
+        ("pop", "rbx"),
+        ("push", "rax"),
+        ("push", "rbx"),
+        ("push", "rax")
+    );
+}
+
 pub fn drop(asm: &mut Vec<String>) {
     asm!(asm, ("pop", "rax"));
+}
+
+pub fn drop2(asm: &mut Vec<String>) {
+    asm!(asm, ("pop", "rax"), ("pop", "rbx"));
+}
+
+pub fn over(asm: &mut Vec<String>) {
+    asm!(
+        asm,
+        ("pop", "rax"),
+        ("pop", "rbx"),
+        ("push", "rbx"),
+        ("push", "rax"),
+        ("push", "rbx")
+    );
 }
 
 pub fn swap(asm: &mut Vec<String>) {

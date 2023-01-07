@@ -9,6 +9,10 @@ edition = "2021"
 name = "worthc"
 path = "src/main.rs"
 
+[lib]
+name = "worthc_macros"
+path = "src/codegen/macros.rs"
+
 [dependencies]
 casey = "0.3.3"
 clap = { version = "4.0.32", features = ["derive"] }
