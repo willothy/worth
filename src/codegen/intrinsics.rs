@@ -2,7 +2,7 @@ use crate::{asm, asm_line, comment, intrinsics, label, sys_exit, syscall};
 use std::fmt::Display;
 use strum_macros::{EnumString, IntoStaticStr};
 
-intrinsics!(Dump, Panic, Dup, Swap, Mem);
+intrinsics!(Dump, Panic, Dup, Swap, Mem, Drop);
 
 impl Display for Intrinsic {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -26,6 +26,10 @@ pub fn dump(asm: &mut Vec<String>) {
 
 pub fn dup(asm: &mut Vec<String>) {
     asm!(asm, ("pop", "rax"), ("push", "rax"), ("push", "rax"));
+}
+
+pub fn drop(asm: &mut Vec<String>) {
+    asm!(asm, ("pop", "rax"));
 }
 
 pub fn swap(asm: &mut Vec<String>) {

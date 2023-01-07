@@ -4,7 +4,6 @@ use crate::instruction::{Instruction, Macro, Program};
 
 pub fn process(mut program: Program) -> Result<Program, String> {
     expand_macros(&mut program);
-    //println!("Preprocessing program: {:#?}", program);
     resolve_jumps(&mut program);
     Ok(program)
 }
@@ -113,10 +112,11 @@ fn expand_macros(program: &mut Program) {
                 macro_stack.push(("do", 0));
             }
             Instruction::If { .. } => {
-                macro_stack.push(("while", 0));
+                macro_stack.push(("if", 0));
             }
             Instruction::Else { .. } => {
-                assert!(macro_stack.pop().unwrap().0 == "if");
+                let pred = macro_stack.pop().unwrap().0;
+                assert!(pred == "if", "Else without if");
                 macro_stack.push(("else", 0));
             }
             Instruction::End { .. } => {

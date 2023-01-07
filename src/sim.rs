@@ -14,15 +14,9 @@ impl BinaryIO {
 
     pub fn stdio() -> Vec<Self> {
         vec![
-            Self::new(
-                Some(Box::new(BufReader::new(io::stdin()))),
-                Some(Box::new(io::stdout())),
-            ),
+            Self::new(Some(Box::new(BufReader::new(io::stdin()))), None),
+            Self::new(None, Some(Box::new(io::stdout()))),
             Self::new(None, Some(Box::new(io::stderr()))),
-            Self::new(
-                Some(Box::new(BufReader::new(io::stdin()))),
-                Some(Box::new(io::stdout())),
-            ),
         ]
     }
 }
@@ -32,6 +26,7 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<(), String> 
         instructions: program,
         ..
     } = program;
+    //println!("Simulating program: {:#?}", program);
     let mut stack = Vec::new();
     let mut bss: Vec<u8> = vec![0; crate::codegen::MEM_CAPACITY];
     let mut fds: Vec<BinaryIO> = BinaryIO::stdio();
@@ -188,6 +183,9 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<(), String> 
                     stack.push(a);
                     stack.push(b);
                 }
+                Intrinsic::Drop => {
+                    stack.pop();
+                }
                 #[allow(unreachable_patterns)]
                 intrinsic => todo!("Implement intrinsic {}", intrinsic),
             },
@@ -258,22 +256,22 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<(), String> 
             Instruction::Lt => {
                 let a = stack.pop().unwrap();
                 let b = stack.pop().unwrap();
-                stack.push((a < b) as i64);
+                stack.push((b < a) as i64);
             }
             Instruction::Gt => {
                 let a = stack.pop().unwrap();
                 let b = stack.pop().unwrap();
-                stack.push((a > b) as i64);
+                stack.push((b > a) as i64);
             }
             Instruction::Lte => {
                 let a = stack.pop().unwrap();
                 let b = stack.pop().unwrap();
-                stack.push((a <= b) as i64);
+                stack.push((b <= a) as i64);
             }
             Instruction::Gte => {
                 let a = stack.pop().unwrap();
                 let b = stack.pop().unwrap();
-                stack.push((a >= b) as i64);
+                stack.push((b >= a) as i64);
             }
             Instruction::Macro => unreachable!("Macro should be expanded before simulation"),
             Instruction::Name(name) => {

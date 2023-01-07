@@ -32,7 +32,6 @@ fn runner(name: String) {
         .arg("S")
         .output()
         .expect("failed to execute process");
-    // TODO: Fix the sim
     assert_eq!(
         sim_output.status.success(),
         true,
@@ -40,8 +39,8 @@ fn runner(name: String) {
         &name
     );
 
-    // assert!(sim_output.stdout == output.stdout);
-    // assert!(sim_output.stderr == output.stderr);
+    assert!(sim_output.stdout == output.stdout);
+    assert!(sim_output.stderr == output.stderr);
 
     // Remove the tmp_test and tmp_test.asm files
     std::fs::remove_file(&out_file).expect("Could not remove tmp_test file");
@@ -65,4 +64,10 @@ fn memory() {
 #[serial]
 fn bitwise() {
     runner("bitwise".to_string());
+}
+
+#[test]
+#[serial]
+fn rule110() {
+    runner("rule110".to_string());
 }
