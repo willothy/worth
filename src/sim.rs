@@ -21,6 +21,9 @@ impl BinaryIO {
     }
 }
 
+const STR_CAPACITY: usize = 4096;
+const BSS_CAPACITY: usize = 640_000;
+
 pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<(), String> {
     let Program {
         instructions: program,
@@ -28,7 +31,9 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<(), String> 
     } = program;
     //println!("Simulating program: {:#?}", program);
     let mut stack = Vec::new();
-    let mut bss: Vec<u8> = vec![0; crate::codegen::MEM_CAPACITY];
+    let mut bss: Vec<u8> = vec![0; STR_CAPACITY + BSS_CAPACITY];
+    let mut str_allocated = 0;
+
     let mut fds: Vec<BinaryIO> = BinaryIO::stdio();
     let debug = opt.debug;
 
@@ -163,6 +168,19 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<(), String> 
             Instruction::Push(val) => match val {
                 Value::Int(i) => stack.push(*i),
                 Value::Char(c) => stack.push((*c) as i64),
+                Value::Str(s) => {
+                    let len = s.as_bytes().len();
+                    stack.push(len as i64);
+                    stack.push(str_allocated as i64);
+                    bss[str_allocated..str_allocated + len].copy_from_slice(s.as_bytes());
+                    str_allocated += len;
+                    if str_allocated > STR_CAPACITY {
+                        panic!(
+                            "String capacity exceeded ({} of {})",
+                            str_allocated, STR_CAPACITY
+                        );
+                    }
+                }
                 Value::Ptr(_name) => todo!(),
             },
             Instruction::Intrinsic(intrinsic) => match intrinsic {
@@ -176,7 +194,7 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<(), String> 
                     stack.push(a);
                     stack.push(a);
                 }
-                Intrinsic::Mem => stack.push(0),
+                Intrinsic::Mem => stack.push(STR_CAPACITY as i64),
                 Intrinsic::Swap => {
                     let a = stack.pop().unwrap();
                     let b = stack.pop().unwrap();

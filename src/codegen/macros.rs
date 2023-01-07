@@ -3,36 +3,41 @@ pub use casey::lower;
 #[macro_export]
 macro_rules! comment {
     ($asm:ident, $s:expr) => {
-        $asm.push(format!("{:4};; {}", " ", $s));
+        $asm.insert(format!("{:4};; {}", " ", $s));
     };
 
     ($asm:ident, $fmt:expr, $s:expr) => {
-        $asm.push(format!("{:4};; {}", " ", format!($fmt, $s)));
+        $asm.insert(format!("{:4};; {}", " ", format!($fmt, $s)));
     };
 }
 
 #[macro_export]
 macro_rules! segment {
     ($asm:ident, $s:expr) => {
-        $asm.push(format!("segment .{}", $s));
+        $asm.set_insert_segment(match $s {
+            "text" => crate::codegen::builder::SegmentKind::Text,
+            "data" => crate::codegen::builder::SegmentKind::Data,
+            "bss" => crate::codegen::builder::SegmentKind::Bss,
+            _ => panic!("Invalid segment"),
+        });
     };
 }
 
 #[macro_export]
 macro_rules! global {
     ($asm:ident, $s:expr) => {
-        $asm.push(format!("global {}", $s));
+        $asm.insert(format!("global {}", $s));
     };
 }
 
 #[macro_export]
 macro_rules! label {
     ($asm:ident, $s:expr) => {
-        $asm.push(format!("{}:", $s));
+        $asm.insert(format!("{}:", $s));
     };
 
     ($asm:ident, $fmt:expr, $s:expr) => {
-        $asm.push(format!("{}:", format!($fmt, $s)));
+        $asm.insert(format!("{}:", format!($fmt, $s)));
     };
 }
 
@@ -41,7 +46,7 @@ macro_rules! asm {
     ($asm:ident, $($(#[$cmt:meta])? ($($args:expr),+)),+) => {
         $(
             {
-                $asm.push(asm_line!($($args),+$(; $cmt)?))
+                $asm.insert(asm_line!($($args),+$(; $cmt)?))
             }
         )*
     };
@@ -89,7 +94,7 @@ macro_rules! intrinsics {
         }
 
         impl Intrinsic {
-            pub fn compile(&self) -> fn(&mut Vec<String>) {
+            pub fn compile(&self) -> fn(&mut crate::codegen::builder::Builder) {
                 use Intrinsic::*;
                 use crate::codegen::intrinsics::*;
                 match self {

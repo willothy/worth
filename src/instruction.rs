@@ -20,9 +20,9 @@ pub struct Macro {
 #[derive(Debug, Clone)]
 pub enum Value {
     Int(i64),
-    #[allow(unused)]
+    Str(String),
     Char(u8),
-    #[allow(unused)]
+    #[allow(dead_code)]
     Ptr(String), // Label or variable name
 }
 

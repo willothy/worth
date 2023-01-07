@@ -1,6 +1,8 @@
 use crate::{asm, asm_line, comment};
 
-pub fn add(asm: &mut Vec<String>) {
+use super::builder::Builder;
+
+pub fn add(asm: &mut Builder) {
     comment!(asm, "-- add --");
     asm!(
         asm,
@@ -11,7 +13,7 @@ pub fn add(asm: &mut Vec<String>) {
     );
 }
 
-pub fn sub(asm: &mut Vec<String>) {
+pub fn sub(asm: &mut Builder) {
     comment!(asm, "-- sub --");
     asm!(
         asm,
@@ -22,7 +24,7 @@ pub fn sub(asm: &mut Vec<String>) {
     );
 }
 
-pub fn mul(asm: &mut Vec<String>) {
+pub fn mul(asm: &mut Builder) {
     comment!(asm, "-- mul --");
     asm!(
         asm,
@@ -33,7 +35,7 @@ pub fn mul(asm: &mut Vec<String>) {
     );
 }
 
-pub fn div(asm: &mut Vec<String>) {
+pub fn div(asm: &mut Builder) {
     comment!(asm, "-- div --");
     // TODO: Test this
     asm!(
@@ -46,7 +48,7 @@ pub fn div(asm: &mut Vec<String>) {
     );
 }
 
-pub fn rem(asm: &mut Vec<String>) {
+pub fn rem(asm: &mut Builder) {
     comment!(asm, "-- mod --");
     // TODO: Test this
     asm!(
@@ -59,12 +61,12 @@ pub fn rem(asm: &mut Vec<String>) {
     );
 }
 
-pub fn not(asm: &mut Vec<String>) {
+pub fn not(asm: &mut Builder) {
     comment!(asm, "-- not --");
     asm!(asm, ("pop", "rax"), ("neg", "rax"), ("push", "rax"));
 }
 
-pub fn band(asm: &mut Vec<String>) {
+pub fn band(asm: &mut Builder) {
     comment!(asm, "-- and --");
     asm!(
         asm,
@@ -75,7 +77,7 @@ pub fn band(asm: &mut Vec<String>) {
     );
 }
 
-pub fn bor(asm: &mut Vec<String>) {
+pub fn bor(asm: &mut Builder) {
     comment!(asm, "-- or --");
     asm!(
         asm,
@@ -86,7 +88,7 @@ pub fn bor(asm: &mut Vec<String>) {
     );
 }
 
-pub fn xor(asm: &mut Vec<String>) {
+pub fn xor(asm: &mut Builder) {
     comment!(asm, "-- xor --");
     asm!(
         asm,
@@ -97,7 +99,7 @@ pub fn xor(asm: &mut Vec<String>) {
     );
 }
 
-pub fn shl(asm: &mut Vec<String>) {
+pub fn shl(asm: &mut Builder) {
     comment!(asm, "-- shl --");
     asm!(
         asm,
@@ -108,7 +110,7 @@ pub fn shl(asm: &mut Vec<String>) {
     );
 }
 
-pub fn shr(asm: &mut Vec<String>) {
+pub fn shr(asm: &mut Builder) {
     comment!(asm, "-- shr --");
     asm!(
         asm,
@@ -119,7 +121,7 @@ pub fn shr(asm: &mut Vec<String>) {
     );
 }
 
-pub fn eq(asm: &mut Vec<String>) {
+pub fn eq(asm: &mut Builder) {
     comment!(asm, "-- eq --");
     asm!(
         asm,
@@ -133,7 +135,7 @@ pub fn eq(asm: &mut Vec<String>) {
     );
 }
 
-pub fn neq(asm: &mut Vec<String>) {
+pub fn neq(asm: &mut Builder) {
     comment!(asm, "-- ne --");
     asm!(
         asm,
@@ -147,7 +149,7 @@ pub fn neq(asm: &mut Vec<String>) {
     );
 }
 
-pub fn lt(asm: &mut Vec<String>) {
+pub fn lt(asm: &mut Builder) {
     comment!(asm, "-- lt --");
     asm!(
         asm,
@@ -161,7 +163,7 @@ pub fn lt(asm: &mut Vec<String>) {
     );
 }
 
-pub fn gt(asm: &mut Vec<String>) {
+pub fn gt(asm: &mut Builder) {
     comment!(asm, "-- gt --");
     asm!(
         asm,
@@ -175,7 +177,7 @@ pub fn gt(asm: &mut Vec<String>) {
     );
 }
 
-pub fn lte(asm: &mut Vec<String>) {
+pub fn lte(asm: &mut Builder) {
     comment!(asm, "-- le --");
     asm!(
         asm,
@@ -189,7 +191,7 @@ pub fn lte(asm: &mut Vec<String>) {
     );
 }
 
-pub fn gte(asm: &mut Vec<String>) {
+pub fn gte(asm: &mut Builder) {
     comment!(asm, "-- ge --");
     asm!(
         asm,
@@ -203,7 +205,7 @@ pub fn gte(asm: &mut Vec<String>) {
     );
 }
 
-pub fn load(asm: &mut Vec<String>) {
+pub fn load(asm: &mut Builder) {
     comment!(asm, "-- load --");
     asm!(
         asm,
@@ -217,7 +219,7 @@ pub fn load(asm: &mut Vec<String>) {
     );
 }
 
-pub fn store(asm: &mut Vec<String>) {
+pub fn store(asm: &mut Builder) {
     comment!(asm, "-- store --");
     asm!(
         asm,
@@ -230,7 +232,7 @@ pub fn store(asm: &mut Vec<String>) {
     );
 }
 
-pub fn syscall0(asm: &mut Vec<String>) {
+pub fn syscall0(asm: &mut Builder) {
     comment!(asm, "-- syscall0 --");
     asm!(
         asm,
@@ -240,7 +242,7 @@ pub fn syscall0(asm: &mut Vec<String>) {
     );
 }
 
-pub fn syscall1(asm: &mut Vec<String>) {
+pub fn syscall1(asm: &mut Builder) {
     comment!(asm, "-- syscall1 --");
     asm!(
         asm,
@@ -251,7 +253,7 @@ pub fn syscall1(asm: &mut Vec<String>) {
     );
 }
 
-pub fn syscall2(asm: &mut Vec<String>) {
+pub fn syscall2(asm: &mut Builder) {
     comment!(asm, "-- syscall2 --");
     asm!(
         asm,
@@ -263,7 +265,7 @@ pub fn syscall2(asm: &mut Vec<String>) {
     );
 }
 
-pub fn syscall3(asm: &mut Vec<String>) {
+pub fn syscall3(asm: &mut Builder) {
     comment!(asm, "-- syscall3 --");
     asm!(
         asm,
@@ -276,7 +278,7 @@ pub fn syscall3(asm: &mut Vec<String>) {
     );
 }
 
-pub fn syscall4(asm: &mut Vec<String>) {
+pub fn syscall4(asm: &mut Builder) {
     comment!(asm, "-- syscall4 --");
     asm!(
         asm,
@@ -290,7 +292,7 @@ pub fn syscall4(asm: &mut Vec<String>) {
     );
 }
 
-pub fn syscall5(asm: &mut Vec<String>) {
+pub fn syscall5(asm: &mut Builder) {
     comment!(asm, "-- syscall5 --");
     asm!(
         asm,
@@ -305,7 +307,7 @@ pub fn syscall5(asm: &mut Vec<String>) {
     );
 }
 
-pub fn syscall6(asm: &mut Vec<String>) {
+pub fn syscall6(asm: &mut Builder) {
     comment!(asm, "-- syscall6 --");
     asm!(
         asm,

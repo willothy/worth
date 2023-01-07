@@ -4,9 +4,10 @@ use nom::{
     branch::alt,
     bytes::complete::tag,
     character::complete::{
-        alpha1, alphanumeric1, char, digit1, hex_digit1, multispace0, multispace1, one_of, satisfy,
+        alphanumeric1, char, digit1, hex_digit1, multispace0, multispace1, satisfy,
     },
-    sequence::{preceded, tuple},
+    multi::many0,
+    sequence::{delimited, preceded, tuple},
     IResult,
 };
 use nom_locate::LocatedSpan;
@@ -35,14 +36,6 @@ pub enum TokenType {
     Value(Value),
     Syscall(usize),
     Empty,
-}
-
-#[derive(Debug, Clone)]
-pub enum ValueType {
-    Int,
-    Char,
-    Str,
-    Ptr,
 }
 
 pub fn parse(source: String, name: &str) -> Result<Program, String> {
@@ -132,9 +125,74 @@ pub fn parse_syscalls<'a>(input: Span<'a>) -> IResult<Span<'a>, Token> {
 }
 
 pub fn parse_value<'a>(input: Span<'a>) -> IResult<Span<'a>, Token> {
-    let (input, token) = alt((parse_int, parse_hex_int))(input)?;
+    let (input, token) = alt((parse_int, parse_hex_int, parse_char, parse_string))(input)?;
 
     Ok((input, token))
+}
+
+pub fn parse_string<'a>(input: Span<'a>) -> IResult<Span<'a>, Token> {
+    let (input, value) = delimited(
+        char('"'),
+        many0(alt((special_char, satisfy(|c| c != '"')))),
+        char('"'),
+    )(input)?;
+    let value = value.into_iter().collect::<String>();
+
+    let token = Token {
+        value: value.to_string(),
+        location: (
+            input.extra.to_string(),
+            input.location_line() as usize,
+            input.get_column(),
+        ),
+        ty: TokenType::Value(Value::Str(value.to_string())),
+    };
+    Ok((input, token))
+}
+
+pub fn parse_char<'a>(input: Span<'a>) -> IResult<Span<'a>, Token> {
+    let (input, value) = delimited(
+        char('\''),
+        alt((special_char, satisfy(|c| c != '\'' && c != '\\'))),
+        char('\''),
+    )(input)?;
+
+    if !value.is_ascii() {
+        return Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
+    }
+
+    let token = Token {
+        value: value.to_string(),
+        location: (
+            input.extra.to_string(),
+            input.location_line() as usize,
+            input.get_column(),
+        ),
+        ty: TokenType::Value(Value::Char(value as u8)),
+    };
+    Ok((input, token))
+}
+
+pub fn special_char<'a>(input: Span<'a>) -> IResult<Span<'a>, char> {
+    let (input, c) = preceded(
+        char('\\'),
+        satisfy(|c| c == 'n' || c == 'r' || c == 't' || c == '\\' || c == '\'' || c == '"'),
+    )(input)?;
+    match c {
+        'n' => Ok((input, '\n')),
+        'r' => Ok((input, '\r')),
+        't' => Ok((input, '\t')),
+        '\\' => Ok((input, '\\')),
+        '\'' => Ok((input, '\'')),
+        '"' => Ok((input, '"')),
+        _ => Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        ))),
+    }
 }
 
 pub fn parse_int<'a>(input: Span<'a>) -> IResult<Span<'a>, Token> {

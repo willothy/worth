@@ -1,7 +1,8 @@
 use crate::{asm, asm_line, comment, intrinsic_str, intrinsics, label, sys_exit, syscall};
 use casey::lower;
 use std::fmt::Display;
-use std::str::FromStr;
+
+use super::builder::Builder;
 
 intrinsics!(
     Dump,
@@ -22,11 +23,11 @@ impl Display for Intrinsic {
     }
 }
 
-pub fn panic(asm: &mut Vec<String>) {
+pub fn panic(asm: &mut Builder) {
     sys_exit!(asm, 1, "-- panic --");
 }
 
-pub fn dump(asm: &mut Vec<String>) {
+pub fn dump(asm: &mut Builder) {
     asm!(
         asm,
         ///Load argument to rdi
@@ -35,11 +36,11 @@ pub fn dump(asm: &mut Vec<String>) {
     );
 }
 
-pub fn dup(asm: &mut Vec<String>) {
+pub fn dup(asm: &mut Builder) {
     asm!(asm, ("pop", "rax"), ("push", "rax"), ("push", "rax"));
 }
 
-pub fn dup2(asm: &mut Vec<String>) {
+pub fn dup2(asm: &mut Builder) {
     asm!(
         asm,
         ///( x1 x2 -> x1 x2 x1 x2 )
@@ -52,15 +53,15 @@ pub fn dup2(asm: &mut Vec<String>) {
     );
 }
 
-pub fn drop(asm: &mut Vec<String>) {
+pub fn drop(asm: &mut Builder) {
     asm!(asm, ("pop", "rax"));
 }
 
-pub fn drop2(asm: &mut Vec<String>) {
+pub fn drop2(asm: &mut Builder) {
     asm!(asm, ("pop", "rax"), ("pop", "rbx"));
 }
 
-pub fn over(asm: &mut Vec<String>) {
+pub fn over(asm: &mut Builder) {
     asm!(
         asm,
         ("pop", "rax"),
@@ -71,7 +72,7 @@ pub fn over(asm: &mut Vec<String>) {
     );
 }
 
-pub fn swap(asm: &mut Vec<String>) {
+pub fn swap(asm: &mut Builder) {
     asm!(
         asm,
         ("pop", "rax"),
@@ -81,11 +82,11 @@ pub fn swap(asm: &mut Vec<String>) {
     );
 }
 
-pub fn mem(asm: &mut Vec<String>) {
+pub fn mem(asm: &mut Builder) {
     asm!(asm, ("push", "mem"));
 }
 
-pub fn gen_intrinsics(asm: &mut Vec<String>) {
+pub fn gen_intrinsics(asm: &mut Builder) {
     // Dump
     label!(asm, "intrinsic_dump");
     asm!(
