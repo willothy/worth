@@ -1,5 +1,19 @@
 use thiserror::Error;
 
+pub trait BoolError {
+    fn to_err(self) -> anyhow::Result<(), ()>;
+}
+
+impl BoolError for bool {
+    fn to_err(self) -> anyhow::Result<(), ()> {
+        if self {
+            Ok(())
+        } else {
+            Err(())
+        }
+    }
+}
+
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("[Compile Error] {0}")]
@@ -18,34 +32,32 @@ pub enum Error {
 pub enum IOError {
     #[error("{0}")]
     Inherited(#[from] std::io::Error),
-    #[error("Could not load file")]
-    FileLoadError,
+    #[error("Invalid filename")]
+    InvalidFilename,
+    #[error("No file extension")]
+    NoFileExtension,
 }
 
 #[derive(Error, Debug)]
 pub enum CompileError {
-    #[error("Nasm invoke error")]
-    NasmInvokeError,
+    #[error("Nasm failed t: {0}")]
+    NasmInvokeError(std::io::Error),
+    #[error("Nasm compile error")]
+    NasmCompileError,
+    #[error("Nasm invoke error: {0}")]
+    LdInvokeError(std::io::Error),
+    #[error("Ld linker error")]
+    LdLinkError,
 }
 
 #[derive(Error, Debug)]
 pub enum ParseError {
     #[error("Failed to parse program")]
     Incomplete,
-    #[error("Unexpected token: {0}")]
-    UnexpectedToken(String),
     #[error("Unknown operator")]
     UnknownOperator,
     #[error("Unknown keyword")]
     UnknownKeyword,
-    #[error("Unexpected end of file")]
-    UnexpectedEof,
-    #[error("Unexpected end of line")]
-    UnexpectedEol,
-    #[error("Unexpected character: {0}")]
-    UnexpectedChar(char),
-    #[error("Unexpected end of string")]
-    UnexpectedEos,
 }
 
 #[derive(Error, Debug)]
@@ -56,6 +68,16 @@ pub enum PreprocessorError {
 
 #[derive(Error, Debug)]
 pub enum RuntimeError {
-    #[error("Invalid instruction pointer: {0}")]
-    InvalidInstructionPointer(usize),
+    #[error("IO Error")]
+    IOError,
+    #[error("Stack underflow")]
+    StackUnderflow,
+    #[error("String capacity exceeded")]
+    StringCapacityExceeded,
+    #[error("Invalid memory access")]
+    InvalidMemoryAccess,
+    #[error("Macro not expanded")]
+    MacroNotExpanded,
+    #[error("Name not resolved")]
+    NameNotResolved,
 }

@@ -1,6 +1,8 @@
 use std::io::{self, BufRead, BufReader, Write};
 
+use crate::error::{Error::RuntimeError, RuntimeError::*};
 use crate::{cli::SimulatorOptions, codegen::intrinsics::Intrinsic, instruction::*};
+use anyhow::{Context, Result};
 
 pub struct BinaryIO {
     pub reader: Option<Box<dyn BufRead>>,
@@ -24,12 +26,11 @@ impl BinaryIO {
 const STR_CAPACITY: usize = 4096;
 const BSS_CAPACITY: usize = 640_000;
 
-pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<(), String> {
+pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<()> {
     let Program {
         instructions: program,
         ..
     } = program;
-    //println!("Simulating program: {:#?}", program);
     let mut stack = Vec::new();
     let mut bss: Vec<u8> = vec![0; STR_CAPACITY + BSS_CAPACITY];
     let mut str_allocated = 0;
@@ -39,6 +40,14 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<(), String> 
 
     let mut ip = 0;
     while ip < program.len() {
+        macro_rules! pop {
+            () => {
+                stack
+                    .pop()
+                    .ok_or(RuntimeError(StackUnderflow))
+                    .with_context(|| format!("Stack underflow at instruction {}", ip))?
+            };
+        }
         let inst = &program[ip];
         if debug {
             println!("ip: {:?} inst: {:?}", ip, inst);
@@ -49,14 +58,14 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<(), String> 
 
         match &inst {
             Instruction::Syscall(SyscallKind::Syscall0) => {
-                let syscall = stack.pop().unwrap();
+                let syscall = pop!();
                 match syscall {
                     number => todo!("Implement syscall0 {}", number),
                 }
             }
             Instruction::Syscall(SyscallKind::Syscall1) => {
-                let syscall = stack.pop().unwrap();
-                let arg1 = stack.pop().unwrap();
+                let syscall = pop!();
+                let arg1 = pop!();
                 match syscall {
                     60 => {
                         // Exit
@@ -71,18 +80,18 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<(), String> 
             }
             #[allow(unused_variables)]
             Instruction::Syscall(SyscallKind::Syscall2) => {
-                let syscall = stack.pop().unwrap();
-                let arg1 = stack.pop().unwrap();
-                let arg2 = stack.pop().unwrap();
+                let syscall = pop!();
+                let arg1 = pop!();
+                let arg2 = pop!();
                 match syscall {
                     number => todo!("Implement syscall2 {}", number),
                 }
             }
             Instruction::Syscall(SyscallKind::Syscall3) => {
-                let syscall = stack.pop().unwrap();
-                let arg1 = stack.pop().unwrap();
-                let arg2 = stack.pop().unwrap();
-                let arg3 = stack.pop().unwrap();
+                let syscall = pop!();
+                let arg1 = pop!();
+                let arg2 = pop!();
+                let arg3 = pop!();
                 match syscall {
                     0 => {
                         // Read
@@ -90,7 +99,16 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<(), String> 
                         let buf = arg2 as usize;
                         let count = arg3 as usize;
                         let buf = &mut bss[buf..buf + count];
-                        fds[fd].reader.as_mut().unwrap().read_exact(buf).unwrap();
+                        fds[fd]
+                            .reader
+                            .as_mut()
+                            .with_context(|| {
+                                format!("File descriptor {} is not opened for reading", fd)
+                            })?
+                            .read_exact(buf)
+                            .with_context(|| {
+                                format!("Failed to read from file descriptor {}", fd)
+                            })?;
                     }
                     1 => {
                         // Write
@@ -98,58 +116,77 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<(), String> 
                         let buf = arg2 as usize;
                         let count = arg3 as usize;
                         let buf = &bss[buf..buf + count];
-                        fds[fd].writer.as_mut().unwrap().write_all(buf).unwrap();
-                        fds[fd].writer.as_mut().unwrap().flush().unwrap();
+                        fds[fd]
+                            .writer
+                            .as_mut()
+                            .ok_or(RuntimeError(IOError))
+                            .with_context(|| {
+                                format!("File descriptor {} is not opened for writing", fd)
+                            })?
+                            .write_all(buf)
+                            .with_context(|| {
+                                format!("Failed to write to file descriptor {}", fd)
+                            })?;
+                        fds[fd]
+                            .writer
+                            .as_mut()
+                            .with_context(|| {
+                                format!("File descriptor {} is not opened for writing", fd)
+                            })?
+                            .flush()
+                            .with_context(|| {
+                                format!("Failed to flush writer for file descriptor {}", fd)
+                            })?;
                     }
                     number => todo!("Implement syscall3 {}", number),
                 }
             }
             #[allow(unused_variables)]
             Instruction::Syscall(SyscallKind::Syscall4) => {
-                let syscall = stack.pop().unwrap();
-                let arg1 = stack.pop().unwrap();
-                let arg2 = stack.pop().unwrap();
-                let arg3 = stack.pop().unwrap();
-                let arg4 = stack.pop().unwrap();
+                let syscall = pop!();
+                let arg1 = pop!();
+                let arg2 = pop!();
+                let arg3 = pop!();
+                let arg4 = pop!();
                 match syscall {
                     number => todo!("Implement syscall4 {}", number),
                 }
             }
             #[allow(unused_variables)]
             Instruction::Syscall(SyscallKind::Syscall5) => {
-                let syscall = stack.pop().unwrap();
-                let arg1 = stack.pop().unwrap();
-                let arg2 = stack.pop().unwrap();
-                let arg3 = stack.pop().unwrap();
-                let arg4 = stack.pop().unwrap();
-                let arg5 = stack.pop().unwrap();
+                let syscall = pop!();
+                let arg1 = pop!();
+                let arg2 = pop!();
+                let arg3 = pop!();
+                let arg4 = pop!();
+                let arg5 = pop!();
                 match syscall {
                     number => todo!("Implement syscall5 {}", number),
                 }
             }
             #[allow(unused_variables)]
             Instruction::Syscall(SyscallKind::Syscall6) => {
-                let syscall = stack.pop().unwrap();
-                let arg1 = stack.pop().unwrap();
-                let arg2 = stack.pop().unwrap();
-                let arg3 = stack.pop().unwrap();
-                let arg4 = stack.pop().unwrap();
-                let arg5 = stack.pop().unwrap();
-                let arg6 = stack.pop().unwrap();
+                let syscall = pop!();
+                let arg1 = pop!();
+                let arg2 = pop!();
+                let arg3 = pop!();
+                let arg4 = pop!();
+                let arg5 = pop!();
+                let arg6 = pop!();
                 match syscall {
                     number => todo!("Implement syscall6 {}", number),
                 }
             }
             Instruction::Keyword(Keyword::While { .. }) => {}
             Instruction::Keyword(Keyword::Do { end_ip }) => {
-                let a = stack.pop().unwrap();
+                let a = pop!();
                 if a == 0 {
                     ip = *end_ip + 1;
                     continue;
                 }
             }
             Instruction::Keyword(Keyword::If { else_ip }) => {
-                let a = stack.pop().unwrap();
+                let a = pop!();
                 if a == 0 {
                     ip = *else_ip + 1;
                     continue;
@@ -175,10 +212,12 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<(), String> 
                     bss[str_allocated..str_allocated + len].copy_from_slice(s.as_bytes());
                     str_allocated += len;
                     if str_allocated > STR_CAPACITY {
-                        panic!(
-                            "String capacity exceeded ({} of {})",
-                            str_allocated, STR_CAPACITY
-                        );
+                        return Err(RuntimeError(StringCapacityExceeded)).with_context(|| {
+                            format!(
+                                "String capacity exceeded: {} > {}",
+                                str_allocated, STR_CAPACITY
+                            )
+                        });
                     }
                 }
                 Value::Ptr(_name) => todo!(),
@@ -186,18 +225,18 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<(), String> 
             Instruction::Intrinsic(intrinsic) => match intrinsic {
                 Intrinsic::Panic => std::process::exit(1),
                 Intrinsic::Dump => {
-                    let a = stack.pop().unwrap();
+                    let a = pop!();
                     println!("{}", a);
                 }
                 Intrinsic::Dup => {
-                    let a = stack.pop().unwrap();
+                    let a = pop!();
                     stack.push(a);
                     stack.push(a);
                 }
                 Intrinsic::Mem => stack.push(STR_CAPACITY as i64),
                 Intrinsic::Swap => {
-                    let a = stack.pop().unwrap();
-                    let b = stack.pop().unwrap();
+                    let a = pop!();
+                    let b = pop!();
                     stack.push(a);
                     stack.push(b);
                 }
@@ -205,8 +244,8 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<(), String> 
                     stack.pop();
                 }
                 Intrinsic::Over => {
-                    let a = stack.pop().unwrap();
-                    let b = stack.pop().unwrap();
+                    let a = pop!();
+                    let b = pop!();
                     stack.push(b);
                     stack.push(a);
                     stack.push(b);
@@ -216,8 +255,8 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<(), String> 
                     stack.pop();
                 }
                 Intrinsic::Dup2 => {
-                    let a = stack.pop().unwrap();
-                    let b = stack.pop().unwrap();
+                    let a = pop!();
+                    let b = pop!();
                     stack.push(b);
                     stack.push(a);
                     stack.push(b);
@@ -227,103 +266,123 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<(), String> 
                 intrinsic => todo!("Implement intrinsic {}", intrinsic),
             },
             Instruction::Op(Op::Add) => {
-                let a = stack.pop().unwrap();
-                let b = stack.pop().unwrap();
+                let a = pop!();
+                let b = pop!();
                 stack.push(a + b);
             }
             Instruction::Op(Op::Sub) => {
-                let a = stack.pop().unwrap();
-                let b = stack.pop().unwrap();
+                let a = pop!();
+                let b = pop!();
                 stack.push(b - a);
             }
             Instruction::Op(Op::Mul) => {
-                let a = stack.pop().unwrap();
-                let b = stack.pop().unwrap();
+                let a = pop!();
+                let b = pop!();
                 stack.push(a * b);
             }
             Instruction::Op(Op::Div) => {
-                let a = stack.pop().unwrap();
-                let b = stack.pop().unwrap();
+                let a = pop!();
+                let b = pop!();
                 stack.push(b / a);
             }
             Instruction::Op(Op::Mod) => {
-                let a = stack.pop().unwrap();
-                let b = stack.pop().unwrap();
+                let a = pop!();
+                let b = pop!();
                 stack.push(a % b);
             }
             Instruction::Op(Op::BitwiseAnd) => {
-                let a = stack.pop().unwrap();
-                let b = stack.pop().unwrap();
+                let a = pop!();
+                let b = pop!();
                 stack.push(a & b);
             }
             Instruction::Op(Op::BitwiseOr) => {
-                let a = stack.pop().unwrap();
-                let b = stack.pop().unwrap();
+                let a = pop!();
+                let b = pop!();
                 stack.push(a | b);
             }
             Instruction::Op(Op::BitwiseXor) => {
-                let a = stack.pop().unwrap();
-                let b = stack.pop().unwrap();
+                let a = pop!();
+                let b = pop!();
                 stack.push(a ^ b);
             }
             Instruction::Op(Op::BitwiseNot) => {
-                let a = stack.pop().unwrap();
+                let a = pop!();
                 stack.push(!a);
             }
             Instruction::Op(Op::Shl) => {
-                let a = stack.pop().unwrap();
-                let b = stack.pop().unwrap();
+                let a = pop!();
+                let b = pop!();
                 stack.push(b << a);
             }
             Instruction::Op(Op::Shr) => {
-                let a = stack.pop().unwrap();
-                let b = stack.pop().unwrap();
+                let a = pop!();
+                let b = pop!();
                 stack.push(b >> a);
             }
             Instruction::Op(Op::Eq) => {
-                let a = stack.pop().unwrap();
-                let b = stack.pop().unwrap();
+                let a = pop!();
+                let b = pop!();
                 stack.push((a == b) as i64);
             }
             Instruction::Op(Op::Neq) => {
-                let a = stack.pop().unwrap();
-                let b = stack.pop().unwrap();
+                let a = pop!();
+                let b = pop!();
                 stack.push((a != b) as i64);
             }
             Instruction::Op(Op::Lt) => {
-                let a = stack.pop().unwrap();
-                let b = stack.pop().unwrap();
+                let a = pop!();
+                let b = pop!();
                 stack.push((b < a) as i64);
             }
             Instruction::Op(Op::Gt) => {
-                let a = stack.pop().unwrap();
-                let b = stack.pop().unwrap();
+                let a = pop!();
+                let b = pop!();
                 stack.push((b > a) as i64);
             }
             Instruction::Op(Op::Lte) => {
-                let a = stack.pop().unwrap();
-                let b = stack.pop().unwrap();
+                let a = pop!();
+                let b = pop!();
                 stack.push((b <= a) as i64);
             }
             Instruction::Op(Op::Gte) => {
-                let a = stack.pop().unwrap();
-                let b = stack.pop().unwrap();
+                let a = pop!();
+                let b = pop!();
                 stack.push((b >= a) as i64);
             }
             Instruction::Op(Op::Store) => {
-                let val = stack.pop().unwrap() % 0xFF;
-                let addr = stack.pop().unwrap();
+                let val = pop!() % 0xFF;
+                let addr = pop!();
+                if addr > (STR_CAPACITY + BSS_CAPACITY) as i64 {
+                    return Err(RuntimeError(InvalidMemoryAccess)).with_context(|| {
+                        format!(
+                            "Invalid memory write: {:x} > {:x}",
+                            addr,
+                            STR_CAPACITY + BSS_CAPACITY
+                        )
+                    });
+                }
                 bss[addr as usize] = val as u8; // Take lower byte only
             }
             Instruction::Op(Op::Load) => {
-                let a = stack.pop().unwrap();
-                stack.push(bss[a as usize] as i64);
+                let addr = pop!();
+                if addr > (STR_CAPACITY + BSS_CAPACITY) as i64 {
+                    return Err(RuntimeError(InvalidMemoryAccess)).with_context(|| {
+                        format!(
+                            "Invalid memory read: {:x} > {:x}",
+                            addr,
+                            STR_CAPACITY + BSS_CAPACITY
+                        )
+                    });
+                }
+                stack.push(bss[addr as usize] as i64);
             }
             Instruction::Keyword(Keyword::Macro) => {
-                unreachable!("Macro should be expanded before simulation")
+                return Err(RuntimeError(MacroNotExpanded))
+                    .with_context(|| format!("Encountered macro definition at {}", ip))
             }
             Instruction::Name(name) => {
-                unreachable!("Name {} should be expanded before simulation", name)
+                return Err(RuntimeError(NameNotResolved))
+                    .with_context(|| format!("Encountered unresolved name at {}: {}", ip, name));
             }
 
             #[allow(unreachable_patterns)]
