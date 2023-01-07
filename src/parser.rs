@@ -1,11 +1,12 @@
-use std::{collections::HashMap, str::FromStr};
+use std::collections::HashMap;
 
 use nom::{
     branch::alt,
     bytes::complete::tag,
-    character::complete::{alphanumeric1, digit1, hex_digit1, multispace0, multispace1},
-    error::ParseError,
-    sequence::preceded,
+    character::complete::{
+        alpha1, alphanumeric1, char, digit1, hex_digit1, multispace0, multispace1, one_of, satisfy,
+    },
+    sequence::{preceded, tuple},
     IResult,
 };
 use nom_locate::LocatedSpan;
@@ -15,7 +16,7 @@ use crate::{
     instruction::{self, Instruction, Keyword, Op, Program, Value},
 };
 
-type Span<'a> = LocatedSpan<&'a str, &'a str>;
+pub type Span<'a> = LocatedSpan<&'a str, &'a str>;
 
 #[derive(Debug, Clone)]
 pub struct Token {
@@ -26,7 +27,7 @@ pub struct Token {
 
 #[derive(Debug, Clone)]
 pub enum TokenType {
-    Intrinsic,
+    Intrinsic(Intrinsic),
     Name,
     Comment,
     Op,
@@ -54,7 +55,7 @@ pub fn parse(source: String, name: &str) -> Result<Program, String> {
             .iter()
             .map(|t| {
                 Ok(match &t.ty {
-                    TokenType::Intrinsic => Instruction::Intrinsic(Intrinsic::from_str(&t.value)?),
+                    TokenType::Intrinsic(i) => Instruction::Intrinsic(i.clone()),
                     TokenType::Name => Instruction::Name(t.value.clone()),
                     TokenType::Op => Instruction::Op(Op::from_str(&t.value)?),
                     TokenType::Keyword => Instruction::Keyword(Keyword::from_str(&t.value)?),
@@ -82,12 +83,13 @@ pub fn parse_program<'a>(input: Span<'a>) -> Result<Vec<Token>, String> {
     let mut input = input;
     let mut tokens = Vec::new();
     while let Ok((rem, token)) = alt((
+        parse_comment,
         parse_keyword,
         parse_value,
         parse_op,
         parse_syscalls,
         parse_intrinsic,
-        parse_comment,
+        parse_name,
         parse_empty,
     ))(input)
     {
@@ -111,7 +113,6 @@ pub fn parse_program<'a>(input: Span<'a>) -> Result<Vec<Token>, String> {
         })
         .cloned()
         .collect();
-    println!("Tokens: {:#?}", tokens);
     Ok(tokens)
 }
 
@@ -119,7 +120,7 @@ pub fn parse_syscalls<'a>(input: Span<'a>) -> IResult<Span<'a>, Token> {
     let (input, syscall) = preceded(tag("syscall"), digit1)(input)?;
 
     let token = Token {
-        value: syscall.fragment().to_string(),
+        value: "syscall".to_owned() + syscall.fragment(),
         location: (
             input.extra.to_string(),
             input.location_line() as usize,
@@ -187,6 +188,15 @@ pub fn parse_empty<'a>(input: Span<'a>) -> IResult<Span<'a>, Token> {
 pub fn parse_intrinsic<'a>(input: Span<'a>) -> IResult<Span<'a>, Token> {
     let (input, instruction) = alphanumeric1(input)?;
 
+    let intrinsic = match crate::codegen::intrinsics::Intrinsic::from_str(instruction.fragment()) {
+        Ok(i) => i,
+        Err(_) => {
+            return Err(nom::Err::Error(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+    };
     let token = Token {
         value: instruction.fragment().to_string(),
         location: (
@@ -194,7 +204,26 @@ pub fn parse_intrinsic<'a>(input: Span<'a>) -> IResult<Span<'a>, Token> {
             input.location_line() as usize,
             input.get_column(),
         ),
-        ty: TokenType::Intrinsic,
+        ty: TokenType::Intrinsic(intrinsic),
+    };
+    Ok((input, token))
+}
+
+pub fn parse_name<'a>(input: Span<'a>) -> IResult<Span<'a>, Token> {
+    let (input, (start, name_rest)) = tuple((
+        alt((satisfy(|c| c.is_alphabetic()), char('_'))),
+        alphanumeric1,
+    ))(input)?;
+    let mut name = name_rest.fragment().to_string();
+    name.insert(0, start);
+    let token = Token {
+        value: name,
+        location: (
+            name_rest.extra.to_string(),
+            name_rest.location_line() as usize,
+            name_rest.get_column() - 1,
+        ),
+        ty: TokenType::Name,
     };
     Ok((input, token))
 }
