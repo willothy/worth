@@ -39,12 +39,10 @@ fn main() -> Result<()> {
 
     let program = load_program(&args.file.canonicalize().expect("Could not find file!"))?;
 
-    let res = match args.command {
+    match args.command {
         Commands::Compile(opt) => codegen::compile(&program, opt)?,
         Commands::Simulate(opt) => sim::simulate(&program, opt)?,
     };
-
-    println!("{:?}", res);
 
     Ok(())
 }
