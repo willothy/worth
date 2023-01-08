@@ -14,6 +14,7 @@ mod parser;
 mod preprocessor;
 mod runner;
 mod sim;
+mod typecheck;
 
 use anyhow::{Context, Result};
 use error::Error::IOError;
@@ -44,6 +45,8 @@ fn main() -> Result<()> {
 
     let program =
         load_program(&args.file).with_context(|| format!("Failed to load {:?}.", args.file))?;
+
+    typecheck::typecheck(&program)?;
 
     match args.command {
         Commands::Build(opt) => {

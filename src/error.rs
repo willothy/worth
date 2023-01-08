@@ -15,10 +15,10 @@ impl BoolError for bool {
 }
 
 #[derive(Error, Debug)]
-pub enum Error {
+pub enum Error<'e> {
     #[error("[Compile Error] {0}")]
     CompileError(CompileError),
-    #[error("[Parse error] {0}")]
+    #[error("[Parse Error] {0}")]
     ParseError(ParseError),
     #[error("[Preprocessor Error] {0}")]
     PreprocessorError(PreprocessorError),
@@ -26,8 +26,18 @@ pub enum Error {
     RuntimeError(RuntimeError),
     #[error("[Runner Error] {0}")]
     RunnerError(RunnerError),
+    #[error("[Typecheck Error] {0}")]
+    TypecheckError(TypecheckError<'e>),
     #[error("[IO Error] {0}")]
     IOError(IOError),
+}
+
+#[derive(Error, Debug)]
+pub enum TypecheckError<'e> {
+    #[error("Stack Underflow")]
+    StackUnderflow,
+    #[error("Invalid type for operation {0}")]
+    InvalidTypeForOp(&'e str),
 }
 
 #[derive(Error, Debug)]
