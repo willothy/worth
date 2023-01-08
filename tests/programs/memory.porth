@@ -1,3 +1,5 @@
+include "../../std.porth"
+
 // Args (right is top): value, addr
 macro memset
     mem swap + swap .
@@ -23,5 +25,5 @@ end
 1 memread 1 + 1 memset
 2 memread 1 + 2 memset
 
-5 mem 1 1 syscall3
+5 mem stdout write
 

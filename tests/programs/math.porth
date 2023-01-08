@@ -6,9 +6,9 @@
 500 80 - print
 
 
-// Modulo
-5 100 mod print
-104 100 mod print
+// Div & Modulo
+5 100 divmod print print
+104 100 divmod print print
 
 
 // Multiply

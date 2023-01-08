@@ -292,9 +292,10 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<()> {
                 let b = pop!();
                 stack.push(b / a);
             }
-            Instruction::Op(Op::Mod) => {
+            Instruction::Op(Op::DivMod) => {
                 let a = pop!();
                 let b = pop!();
+                stack.push(b / a);
                 stack.push(b % a);
             }
             Instruction::Op(Op::BitwiseAnd) => {

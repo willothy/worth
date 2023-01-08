@@ -49,7 +49,7 @@ pub enum Op {
     Sub,
     Mul,
     Div,
-    Mod,
+    DivMod,
     BitwiseAnd,
     BitwiseOr,
     BitwiseXor,
@@ -64,6 +64,7 @@ pub enum Op {
     Gte,
     Store,
     Load,
+    Mod,
 }
 
 impl Op {
@@ -72,8 +73,8 @@ impl Op {
             "+" => Ok(Op::Add),
             "-" => Ok(Op::Sub),
             "*" => Ok(Op::Mul),
-            "/" => Ok(Op::Div),
-            "%" | "mod" => Ok(Op::Mod),
+            //"/" => Ok(Op::Div),
+            "divmod" => Ok(Op::DivMod),
             "&" | "band" => Ok(Op::BitwiseAnd),
             "|" | "bor" => Ok(Op::BitwiseOr),
             "^" | "bxor" => Ok(Op::BitwiseXor),
@@ -102,6 +103,7 @@ impl std::fmt::Display for Op {
             Op::Mul => write!(f, "*"),
             Op::Div => write!(f, "/"),
             Op::Mod => write!(f, "mod"),
+            Op::DivMod => write!(f, "divmod"),
             Op::BitwiseAnd => write!(f, "band"),
             Op::BitwiseOr => write!(f, "bor"),
             Op::BitwiseXor => write!(f, "bxor"),

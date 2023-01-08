@@ -136,8 +136,30 @@ pub fn parse_syscalls<'a>(input: Span<'a>) -> IResult<Span<'a>, Token> {
 }
 
 pub fn parse_value<'a>(input: Span<'a>) -> IResult<Span<'a>, Token> {
-    let (input, token) = alt((parse_int, parse_hex_int, parse_char, parse_string))(input)?;
+    let (input, token) = alt((
+        parse_int,
+        parse_hex_int,
+        parse_char,
+        parse_string,
+        parse_bool,
+    ))(input)?;
 
+    Ok((input, token))
+}
+
+pub fn parse_bool<'a>(input: Span<'a>) -> IResult<Span<'a>, Token> {
+    let (input, value) = alt((tag("true"), tag("false")))(input)?;
+    let value = value.fragment().parse::<bool>().unwrap();
+
+    let token = Token {
+        value: value.to_string(),
+        location: (
+            input.extra.to_string(),
+            input.location_line() as usize,
+            input.get_column(),
+        ),
+        ty: TokenType::Value(Value::Int(value as i64)),
+    };
     Ok((input, token))
 }
 
@@ -266,14 +288,16 @@ pub fn parse_name<'a>(input: Span<'a>) -> IResult<Span<'a>, Token> {
     let extra = input.extra.to_owned();
     let line = input.location_line();
     let col = input.get_column();
-    let (input, (start, name_rest)) = tuple((
+    /* let (input, (start, name_rest)) = tuple((
         alt((satisfy(|c| c.is_alphabetic()), char('_'))),
         opt(many1(alt((satisfy(|c| c.is_alphanumeric()), char('_'))))),
     ))(input)?;
     let mut name = vec![start];
     if let Some(rest) = name_rest {
         name.extend(rest);
-    }
+    } */
+    // match any non whitespace character
+    let (input, name) = many1(satisfy(|c| !c.is_whitespace()))(input)?;
     let token = Token {
         value: name.iter().collect(),
         location: (extra, line as usize, col - 1),
@@ -311,9 +335,9 @@ fn ops1<'a>(input: Span<'a>) -> IResult<Span<'a>, Span<'a>> {
         tag("+"),
         tag("-"),
         tag("*"),
-        tag("/"),
-        tag("%"),
-        tag("mod"),
+        //tag("/"),
+        //tag("%"),
+        tag("divmod"),
         tag("&"),
         tag("band"),
         tag("|"),
@@ -332,12 +356,12 @@ fn ops1<'a>(input: Span<'a>) -> IResult<Span<'a>, Span<'a>> {
 
 fn ops2<'a>(input: Span<'a>) -> IResult<Span<'a>, Span<'a>> {
     let (input, instruction) = alt((
-        tag("="),
         tag("!="),
-        tag("<"),
-        tag(">"),
         tag("<="),
         tag(">="),
+        tag("<"),
+        tag(">"),
+        tag("="),
         tag("."),
         tag(","),
     ))(input)?;

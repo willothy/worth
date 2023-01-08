@@ -40,16 +40,16 @@ pub fn div(asm: &mut Builder) {
     // TODO: Test this
     asm!(
         asm,
-        ("pop", "rax"),
+        ("xor", "rdx, rdx"),
         ("pop", "rbx"),
-        ("cqo"),
-        ("idiv", "rbx"),
+        ("pop", "rax"),
+        ("div", "rbx"),
         ("push", "rax")
     );
 }
 
-pub fn rem(asm: &mut Builder) {
-    comment!(asm, "-- mod --");
+pub fn mod_(asm: &mut Builder) {
+    comment!(asm, "-- divmod --");
     // TODO: Test this
     asm!(
         asm,
@@ -57,6 +57,20 @@ pub fn rem(asm: &mut Builder) {
         ("pop", "rbx"),
         ("pop", "rax"),
         ("div", "rbx"),
+        ("push", "rdx")
+    );
+}
+
+pub fn divmod(asm: &mut Builder) {
+    comment!(asm, "-- divmod --");
+    // TODO: Test this
+    asm!(
+        asm,
+        ("xor", "rdx, rdx"),
+        ("pop", "rbx"),
+        ("pop", "rax"),
+        ("div", "rbx"),
+        ("push", "rax"),
         ("push", "rdx")
     );
 }

@@ -10,10 +10,15 @@ pub fn process(mut program: Program) -> Result<Program> {
         "Failed to process includes for {}.porth",
         program.name
     ))?;
-    macros(&mut program).context(format!(
+    collect_macros(&mut program).context(format!(
         "Failed to process macros for {}.porth",
         program.name
     ))?;
+    while expand_macros(&mut program).context(format!(
+        "Failed to process macros for {}.porth",
+        program.name
+    ))? == true
+    {}
     jumps(&mut program).context(format!(
         "Failed to process jumps for {}.porth",
         program.name
@@ -104,8 +109,7 @@ fn includes(program: &mut Program) -> Result<()> {
     Ok(())
 }
 
-fn macros(program: &mut Program) -> Result<()> {
-    let mut macros = HashMap::new();
+fn collect_macros(program: &mut Program) -> Result<()> {
     let mut macro_body = Vec::new();
     let mut macro_name = String::new();
     let mut macro_stack = Vec::new();
@@ -138,7 +142,8 @@ fn macros(program: &mut Program) -> Result<()> {
                     "macro" => {
                         if in_macro {
                             in_macro = false;
-                            macros.insert(
+
+                            program.macros.insert(
                                 macro_name.clone(),
                                 Macro {
                                     name: macro_name.clone(),
@@ -180,11 +185,45 @@ fn macros(program: &mut Program) -> Result<()> {
             macro_body.push(instruction.clone());
         }
     }
+    Ok(())
+}
+
+fn expand_macros(program: &mut Program) -> Result<bool> {
+    let mut macro_stack = Vec::new();
+    let mut has_expanded = false;
+    // Expand macros in macros
+    /* let mut expanded_macros = HashMap::new();
+    for (_, macro_) in &program.macros {
+        let mut new_body = Vec::new();
+        macro_stack.clear();
+        for inst in &macro_.body {
+            match inst {
+                Instruction::Name(name) => {
+                    if let Some(macro_) = program.macros.get(name) {
+                        new_body.extend(macro_.body.clone());
+                        continue;
+                    }
+                }
+                _ => {}
+            }
+            new_body.push(inst.clone());
+        }
+        expanded_macros.insert(
+            macro_.name.clone(),
+            Macro {
+                name: macro_.name.clone(),
+                body: new_body,
+                loc: macro_.loc,
+                uses: vec![],
+            },
+        );
+    }
+    program.macros = expanded_macros; */
 
     // Expand macros
     let mut new_instructions = Vec::new();
     macro_stack.clear();
-    in_macro = false;
+    let mut in_macro = false;
     for inst in program.instructions.iter() {
         match inst {
             Instruction::Keyword(Keyword::Macro) => {
@@ -194,8 +233,9 @@ fn macros(program: &mut Program) -> Result<()> {
             }
             Instruction::Name(name) => {
                 if !in_macro {
-                    if let Some(macro_) = macros.get(name) {
+                    if let Some(macro_) = program.macros.get(name) {
                         new_instructions.extend(macro_.body.clone());
+                        has_expanded = true;
                         continue;
                     }
                 }
@@ -251,7 +291,7 @@ fn macros(program: &mut Program) -> Result<()> {
         }
     }
     program.instructions = new_instructions;
-    Ok(())
+    Ok(has_expanded)
 }
 
 fn jumps(program: &mut Program) -> Result<()> {

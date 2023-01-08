@@ -1,9 +1,6 @@
-// Args: len, char*
-macro write
-    1 1 syscall3
-end
+include "../../std.porth"
 
-"Hello, World\n" write
+"Hello, World\n" stdout write
 
 // Old method! //
 

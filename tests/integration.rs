@@ -2,9 +2,9 @@ use std::{path::PathBuf, process::Command};
 
 use serial_test::serial;
 
-fn runner(name: String) {
+fn runner(category: &str, name: &str) {
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests");
-    let file = dir.join("programs").join(&name).with_extension("porth");
+    let file = dir.join(&category).join(&name).with_extension("porth");
     let out_file = dir.join("tmp_test").with_extension("");
     println!("file: {:?}", file);
     let output = test_bin::get_test_bin("worthc")
@@ -61,47 +61,72 @@ fn runner(name: String) {
 #[test]
 #[serial]
 fn hello_world() {
-    runner("hello".to_string());
+    runner("programs", "hello");
 }
 
 #[test]
 #[serial]
 fn memory() {
-    runner("memory".to_string());
+    runner("programs", "memory");
 }
 
 #[test]
 #[serial]
 fn bitwise() {
-    runner("bitwise".to_string());
+    runner("programs", "bitwise");
 }
 
 #[test]
 #[serial]
 fn rule110() {
-    runner("rule110".to_string());
+    runner("programs", "rule110");
 }
 
 #[test]
 #[serial]
 fn string() {
-    runner("string".to_string());
+    runner("programs", "string");
 }
 
 #[test]
 #[serial]
 fn char() {
-    runner("char".to_string());
+    runner("programs", "char");
 }
 
 #[test]
 #[serial]
 fn include() {
-    runner("include".to_string());
+    runner("programs", "include");
 }
 
 #[test]
 #[serial]
 fn math() {
-    runner("math".to_string());
+    runner("programs", "math");
 }
+
+#[test]
+#[serial]
+fn euler1() {
+    runner("euler", "problem01");
+}
+
+#[test]
+#[serial]
+fn euler2() {
+    runner("euler", "problem02");
+}
+
+/* #[test]
+#[serial]
+fn euler4() {
+    runner("euler", "problem04");
+}
+ */
+/* #[test]
+#[serial]
+fn euler5() {
+    runner("euler", "problem05");
+}
+ */
