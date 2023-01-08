@@ -1,8 +1,12 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, path::PathBuf};
 
 use crate::{
     codegen::intrinsics::Intrinsic,
-    error::{Error::ParseError, ParseError::*},
+    error::{
+        Error::{IOError, ParseError},
+        IOError::InvalidPath,
+        ParseError::*,
+    },
     instruction::{self, Instruction, Keyword, Op, Program, Value},
 };
 use anyhow::{anyhow, Context, Result};
@@ -39,12 +43,17 @@ pub enum TokenType {
     Empty,
 }
 
-pub fn parse(source: String, name: &str) -> Result<Program> {
+pub fn parse(source: String, name: &str, path: PathBuf) -> Result<Program> {
     let source = Span::new_extra(source.as_str(), name);
     let tokens = parse_program(source)?;
 
     Ok(Program {
         name: name.to_string(),
+        base_path: path
+            .parent()
+            .ok_or(IOError(InvalidPath))
+            .with_context(|| format!("Could not get parent of {:?}", path))?
+            .to_path_buf(),
         instructions: tokens
             .iter()
             .map(|t| {
@@ -64,8 +73,14 @@ pub fn parse(source: String, name: &str) -> Result<Program> {
                         6 => instruction::SyscallKind::Syscall6,
                         _ => return Err(anyhow!("Syscall number {} is out of range (0-6)", n)),
                     }),
-                    TokenType::Comment => unreachable!("Comment should be filtered out"),
-                    TokenType::Empty => unreachable!("Empty should be filtered out"),
+                    TokenType::Comment => {
+                        return Err(ParseError(UnexpectedToken("comment".into())))
+                            .with_context(|| "Comment should be filtered out")
+                    }
+                    TokenType::Empty => {
+                        return Err(ParseError(UnexpectedToken("empty".into())))
+                            .with_context(|| "Empty should be filtered out")
+                    }
                 })
             })
             .collect::<Result<Vec<_>>>()?,
@@ -293,6 +308,7 @@ pub fn parse_keyword<'a>(input: Span<'a>) -> IResult<Span<'a>, Token> {
         tag("else"),
         tag("macro"),
         tag("end"),
+        tag("include"),
     ))(input)?;
     Ok((
         input,

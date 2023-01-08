@@ -1,16 +1,93 @@
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 use crate::error::{Error::PreprocessorError, PreprocessorError::*};
-use crate::instruction::{Instruction, Keyword, Macro, Program};
+use crate::instruction::{Instruction, Keyword, Macro, Program, Value};
 use anyhow::{Context, Result};
 
 pub fn process(mut program: Program) -> Result<Program> {
-    expand_macros(&mut program)?;
-    resolve_jumps(&mut program)?;
+    includes(&mut program)?;
+    macros(&mut program)?;
+    jumps(&mut program)?;
     Ok(program)
 }
 
-fn expand_macros(program: &mut Program) -> Result<()> {
+fn process_include(program: &mut Program) -> Result<()> {
+    includes(program)?;
+    Ok(())
+}
+
+fn includes(program: &mut Program) -> Result<()> {
+    let mut include_paths = Vec::new();
+    let mut inst_to_remove = Vec::new();
+
+    let mut instructions = program.instructions.iter().enumerate();
+
+    // Collect includes
+    loop {
+        let Some((ip, instruction)) = instructions.next() else {
+            break;
+        };
+
+        match instruction {
+            Instruction::Keyword(Keyword::Include) => {
+                inst_to_remove.push(ip);
+
+                let Some((ip, include)) = instructions.next() else {
+                    break;
+                };
+                match include {
+                    Instruction::Push(Value::Str(path)) => {
+                        include_paths.push(PathBuf::from(path));
+                        inst_to_remove.push(ip);
+                    }
+                    other => {
+                        return Err(PreprocessorError(InvalidInclude(other.to_string())).into())
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    // Remove include instructions
+    let mut offset = 0;
+    for ip in inst_to_remove {
+        program.instructions.remove(ip - offset);
+        offset += 1;
+    }
+
+    // Process includes
+    let base_path = program.base_path.clone();
+    for include in include_paths {
+        let include_path = base_path
+            .join(&include)
+            .canonicalize()
+            .with_context(|| format!("Failed to canonicalize include path {:?}", include))?;
+        let include_file = std::fs::read_to_string(include_path.clone())
+            .with_context(|| format!("Failed to read include file {:?}", include_path))?;
+        let name = include_path
+            .clone()
+            .with_extension("")
+            .file_name()
+            .ok_or(PreprocessorError(
+                crate::error::PreprocessorError::InvalidFilename(
+                    include_path.clone().to_string_lossy().to_string(),
+                ),
+            ))?
+            .to_string_lossy()
+            .to_string();
+        let mut include_program = crate::parser::parse(include_file, &name, include_path)?;
+        process_include(&mut include_program)?;
+
+        program
+            .instructions
+            .append(&mut include_program.instructions);
+    }
+    Ok(())
+}
+
+fn macros(program: &mut Program) -> Result<()> {
     let mut macros = HashMap::new();
     let mut macro_body = Vec::new();
     let mut macro_name = String::new();
@@ -160,7 +237,7 @@ fn expand_macros(program: &mut Program) -> Result<()> {
     Ok(())
 }
 
-fn resolve_jumps(program: &mut Program) -> Result<()> {
+fn jumps(program: &mut Program) -> Result<()> {
     let mut jump_stack = Vec::new();
     for (ip, instruction) in program.instructions.iter_mut().enumerate() {
         match instruction {

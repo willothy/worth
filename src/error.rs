@@ -44,6 +44,8 @@ pub enum IOError {
     Inherited(#[from] std::io::Error),
     #[error("Invalid filename")]
     InvalidFilename,
+    #[error("Invalid path")]
+    InvalidPath,
     #[error("No file extension")]
     NoFileExtension,
 }
@@ -58,6 +60,8 @@ pub enum CompileError {
     LdInvokeError(std::io::Error),
     #[error("Ld linker error")]
     LdLinkError,
+    #[error("Unexpected token: {0}")]
+    UnexpectedToken(String),
 }
 
 #[derive(Error, Debug)]
@@ -68,12 +72,18 @@ pub enum ParseError {
     UnknownOperator,
     #[error("Unknown keyword")]
     UnknownKeyword,
+    #[error("Unexpected token: {0}")]
+    UnexpectedToken(String),
 }
 
 #[derive(Error, Debug)]
 pub enum PreprocessorError {
     #[error("Unexpected keyword")]
     UnexpectedKeyword,
+    #[error("Invalid include {0}")]
+    InvalidInclude(String),
+    #[error("Invalid filename {0}")]
+    InvalidFilename(String),
 }
 
 #[derive(Error, Debug)]

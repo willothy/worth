@@ -9,7 +9,7 @@ fn runner(name: String) {
     println!("file: {:?}", file);
     let output = test_bin::get_test_bin("worthc")
         .arg(&file)
-        .args(["C", "-o"])
+        .args(["build", "-o"])
         .arg(&out_file)
         .output()
         .expect("failed to execute process");

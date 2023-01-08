@@ -140,11 +140,17 @@ pub fn compile(program: &Program, opt: CompilerOptions) -> Result<PathBuf> {
             Instruction::Syscall(SyscallKind::Syscall4) => ops::syscall4(&mut asm),
             Instruction::Syscall(SyscallKind::Syscall5) => ops::syscall5(&mut asm),
             Instruction::Syscall(SyscallKind::Syscall6) => ops::syscall6(&mut asm),
+            Instruction::Keyword(Keyword::Include) => {
+                return Err(CompileError(UnexpectedToken("include".into())))
+                    .with_context(|| "Include should be expanded before codegen")
+            }
             Instruction::Keyword(Keyword::Macro) => {
-                unreachable!("Macro should be expanded before codegen")
+                return Err(CompileError(UnexpectedToken("macro".into())))
+                    .with_context(|| "Macro should be expanded before codegen")
             }
             Instruction::Name(name) => {
-                unreachable!("Name {} should be expanded before codegen", name)
+                return Err(CompileError(UnexpectedToken("macro".into())))
+                    .with_context(|| format!("Name {} should be resolved before codegen", name))
             }
         }
     }

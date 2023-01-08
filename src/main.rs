@@ -31,7 +31,7 @@ fn load_program(path: &PathBuf) -> Result<Program> {
 
     let source = std::fs::read_to_string(path).map_err(|e| IOError(Inherited(e)))?;
 
-    let program = parser::parse(source, name)?;
+    let program = parser::parse(source, name, path.clone())?;
     let program = preprocessor::process(program)?;
     Ok(program)
 }
