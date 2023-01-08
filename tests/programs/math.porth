@@ -1,0 +1,15 @@
+// Add
+34 46  + print
+
+
+// Subtract
+500 80 - print
+
+
+// Modulo
+5 100 mod print
+104 100 mod print
+
+
+// Multiply
+42 10 * print

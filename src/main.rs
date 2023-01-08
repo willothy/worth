@@ -20,6 +20,9 @@ use error::Error::IOError;
 use error::IOError::*;
 
 fn load_program(path: &PathBuf) -> Result<Program> {
+    let path = path
+        .canonicalize()
+        .with_context(|| format!("Failed to canonicalize path {:?}", path))?;
     let name = path.clone().with_extension("");
     let name = name
         .file_name()
@@ -29,7 +32,7 @@ fn load_program(path: &PathBuf) -> Result<Program> {
         .ok_or(IOError(InvalidFilename))
         .with_context(|| format!("Path {:?} does not have a valid filename", path))?;
 
-    let source = std::fs::read_to_string(path).map_err(|e| IOError(Inherited(e)))?;
+    let source = std::fs::read_to_string(&path).map_err(|e| IOError(Inherited(e)))?;
 
     let program = parser::parse(source, name, path.clone())?;
     let program = preprocessor::process(program)?;
@@ -39,7 +42,8 @@ fn load_program(path: &PathBuf) -> Result<Program> {
 fn main() -> Result<()> {
     let args = Cli::parse();
 
-    let program = load_program(&args.file.canonicalize().expect("Could not find file!"))?;
+    let program =
+        load_program(&args.file).with_context(|| format!("Failed to load {:?}.", args.file))?;
 
     match args.command {
         Commands::Build(opt) => {

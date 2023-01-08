@@ -5,7 +5,7 @@ use std::fmt::Display;
 use super::builder::Builder;
 
 intrinsics!(
-    Dump,
+    Print,
     Panic,
     Dup,
     Dup2 = "2dup",
@@ -27,12 +27,12 @@ pub fn panic(asm: &mut Builder) {
     sys_exit!(asm, 1, "-- panic --");
 }
 
-pub fn dump(asm: &mut Builder) {
+pub fn print(asm: &mut Builder) {
     asm!(
         asm,
         ///Load argument to rdi
         ("pop", "rdi"),
-        ("call", "intrinsic_dump")
+        ("call", "intrinsic_print")
     );
 }
 
@@ -87,8 +87,8 @@ pub fn mem(asm: &mut Builder) {
 }
 
 pub fn gen_intrinsics(asm: &mut Builder) {
-    // Dump
-    label!(asm, "intrinsic_dump");
+    // Print
+    label!(asm, "intrinsic_print");
     asm!(
         asm,
         ("push", "rbp"),
@@ -100,7 +100,7 @@ pub fn gen_intrinsics(asm: &mut Builder) {
         ("sub", "rax, qword [rbp - 56]"),
         ("mov", "byte [rbp + rax - 48], 10")
     );
-    label!(asm, ".intrinsic_dump_body");
+    label!(asm, ".intrinsic_print_body");
     asm!(
         asm,
         ("mov", "rax, qword [rbp - 8]"),
@@ -122,7 +122,7 @@ pub fn gen_intrinsics(asm: &mut Builder) {
         ("div", "rcx"),
         ("mov", "qword [rbp - 8], rax"),
         ("cmp", "qword [rbp - 8], 0"),
-        ("jne", ".intrinsic_dump_body"),
+        ("jne", ".intrinsic_print_body"),
         ("mov", "eax, 32"),
         ("sub", "rax, qword [rbp - 56]"),
         ("lea", "rsi, [rbp - 48]"),

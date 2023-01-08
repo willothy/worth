@@ -231,7 +231,7 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<()> {
             },
             Instruction::Intrinsic(intrinsic) => match intrinsic {
                 Intrinsic::Panic => std::process::exit(1),
-                Intrinsic::Dump => {
+                Intrinsic::Print => {
                     let a = pop!();
                     println!("{}", a);
                 }
@@ -295,7 +295,7 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<()> {
             Instruction::Op(Op::Mod) => {
                 let a = pop!();
                 let b = pop!();
-                stack.push(a % b);
+                stack.push(b % a);
             }
             Instruction::Op(Op::BitwiseAnd) => {
                 let a = pop!();

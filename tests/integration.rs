@@ -25,9 +25,11 @@ fn runner(name: String) {
     assert_eq!(
         output.status.success(),
         true,
-        "\n\n------ Test Error ------\nProgram {} exited with non-zero status:\n\n{}\n---- End Test Error ----\n",
+        "\n\n------ Test Error ------\nProgram {} exited with non-zero status:\n\n{}\n---- End Test Error ----\n------- Test Out -------\nProgram {} exited with non-zero status:\n\n{}\n----- End Test Out -----\n",
         &name,
-        unsafe { String::from_utf8_unchecked(output.stderr) }
+        unsafe { String::from_utf8_unchecked(output.stderr) },
+        &name,
+        unsafe { String::from_utf8_unchecked(output.stdout) }
     );
     let sim_output = test_bin::get_test_bin("worthc")
         .arg(file)
@@ -42,7 +44,14 @@ fn runner(name: String) {
         unsafe { String::from_utf8_unchecked(sim_output.stderr) }
     );
 
-    assert!(sim_output.stdout == output.stdout);
+    assert!(
+        sim_output.stdout == output.stdout,
+        "\nSim:\nStdout:\n{}\n\nStderr:\n{}\n\nTest:\nStdout:\n{}\n\nStderr:\n{}\n",
+        unsafe { String::from_utf8_unchecked(sim_output.stdout) },
+        unsafe { String::from_utf8_unchecked(sim_output.stderr) },
+        unsafe { String::from_utf8_unchecked(output.stdout) },
+        unsafe { String::from_utf8_unchecked(output.stderr) }
+    );
     assert!(sim_output.stderr == output.stderr);
 
     // Remove the tmp_test file
@@ -77,4 +86,22 @@ fn rule110() {
 #[serial]
 fn string() {
     runner("string".to_string());
+}
+
+#[test]
+#[serial]
+fn char() {
+    runner("char".to_string());
+}
+
+#[test]
+#[serial]
+fn include() {
+    runner("include".to_string());
+}
+
+#[test]
+#[serial]
+fn math() {
+    runner("math".to_string());
 }

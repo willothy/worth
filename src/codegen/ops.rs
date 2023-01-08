@@ -30,7 +30,7 @@ pub fn mul(asm: &mut Builder) {
         asm,
         ("pop", "rax"),
         ("pop", "rbx"),
-        ("imul", "rbx"),
+        ("mul", "rbx"),
         ("push", "rax")
     );
 }
@@ -53,10 +53,10 @@ pub fn rem(asm: &mut Builder) {
     // TODO: Test this
     asm!(
         asm,
+        ("xor", "rdx, rdx"),
+        ("pop", "rbx"),
         ("pop", "rax"),
-        ("pop", "rcx"),
-        ("cqo"),
-        ("idiv", "rcx"),
+        ("div", "rbx"),
         ("push", "rdx")
     );
 }

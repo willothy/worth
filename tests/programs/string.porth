@@ -1,8 +1,11 @@
-// String literal tests for Porth
+include "../../std.porth"
 
-"Hello, world!" 1 1 syscall3
-"Hello, world!\n" 1 1 syscall3
-"Hello, world!\r\n" 1 1 syscall3
-"\tHello, world!" 1 1 syscall3
-"\"Hello, world!\"" 1 1 syscall3
-"Hello, world!\n" 1 1 syscall3
+"Hello, world!" write
+"Hello, world!\n" write
+"Hello, world!\r\n" write
+"\tHello, world!" write
+"\"Hello, world!\"" write
+"Hello, world!\n" write
+"Hello, wo
+
+rld!\n" write

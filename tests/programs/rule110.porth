@@ -3,9 +3,9 @@ mem 28 + 1 .
 0 while dup 28 < do
    0 while dup 30 < do
       dup mem + , if
-         mem 30 + 42 .
+         mem 30 + '*' .
       else
-         mem 30 + 32 .
+         mem 30 + ' ' .
       end
       1 mem 30 + 1 1 syscall3
 

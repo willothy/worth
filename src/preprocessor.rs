@@ -6,9 +6,18 @@ use crate::instruction::{Instruction, Keyword, Macro, Program, Value};
 use anyhow::{Context, Result};
 
 pub fn process(mut program: Program) -> Result<Program> {
-    includes(&mut program)?;
-    macros(&mut program)?;
-    jumps(&mut program)?;
+    includes(&mut program).context(format!(
+        "Failed to process includes for {}.porth",
+        program.name
+    ))?;
+    macros(&mut program).context(format!(
+        "Failed to process macros for {}.porth",
+        program.name
+    ))?;
+    jumps(&mut program).context(format!(
+        "Failed to process jumps for {}.porth",
+        program.name
+    ))?;
     Ok(program)
 }
 
@@ -18,6 +27,8 @@ fn process_include(program: &mut Program) -> Result<()> {
 }
 
 fn includes(program: &mut Program) -> Result<()> {
+    // TODO: Safety method for recursive includes
+    // TODO: Search path for includes
     let mut include_paths = Vec::new();
     let mut inst_to_remove = Vec::new();
 
@@ -60,8 +71,14 @@ fn includes(program: &mut Program) -> Result<()> {
     // Process includes
     let base_path = program.base_path.clone();
     for include in include_paths {
-        let include_path = base_path
-            .join(&include)
+        let include_path = base_path.join(&include);
+        if !include_path.exists() {
+            return Err(PreprocessorError(IncludeNotFound(
+                include.clone().to_string_lossy().to_string(),
+            )))
+            .with_context(|| format!("Invalid include {:?}", include));
+        }
+        let include_path = include_path
             .canonicalize()
             .with_context(|| format!("Failed to canonicalize include path {:?}", include))?;
         let include_file = std::fs::read_to_string(include_path.clone())

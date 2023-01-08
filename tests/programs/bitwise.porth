@@ -1,11 +1,11 @@
 // shift left
-1 3 shl dump // Should be 8
+1 3 shl print // Should be 8
 
 // shift right
-32 3 shr dump // Should be 4
+32 3 shr print // Should be 4
 
 // bit or
-1 2 bor dump // Should be 3
+1 2 bor print // Should be 3
 
 // bit and
-1 2 band dump // Should be 0
+1 2 band print // Should be 0

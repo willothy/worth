@@ -33,20 +33,20 @@ pub struct CompilerOptions {
 
 #[derive(Debug, Parser, Clone)]
 pub struct RunOptions {
-    #[clap(short, long)]
+    #[clap(
+        short,
+        help = "Output file name / type [ types: .asm, .o, .exe ]\nIf file extension is not specified, .exe is assumed."
+    )]
     pub output: Option<PathBuf>,
-    #[clap(short = 'k', long)]
+    #[clap(short = 'k', help = "Keep the assembly file after compilation.")]
     pub keep_asm: bool,
-    #[clap(short = 'K', long)]
+    #[clap(short = 'K', help = "Keep the object file after compilation.")]
     pub keep_obj: bool,
-    #[clap(short = 'd', long)]
+    #[clap(short = 'd', help = "Enable debug mode.")]
     pub debug: bool,
     #[clap(
-        long = "",
-        help = "Anything after \"--\" will be passed to the run command"
+        long_help = "Arguments to pass to the program, use -- to separate them from the compiler arguments.\nExample: ./worthc test.porth run -d -- arg1 arg2."
     )]
-    pub delim: bool,
-    #[clap(requires = "delim")]
     pub run_args: Vec<String>,
 }
 

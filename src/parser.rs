@@ -16,8 +16,9 @@ use nom::{
     character::complete::{
         alphanumeric1, char, digit1, hex_digit1, multispace0, multispace1, satisfy,
     },
-    multi::many0,
-    sequence::{delimited, preceded, tuple},
+    combinator::{eof, opt},
+    multi::{many0, many1},
+    sequence::{delimited, preceded, terminated, tuple},
     IResult,
 };
 use nom_locate::LocatedSpan;
@@ -40,7 +41,6 @@ pub enum TokenType {
     Keyword,
     Value(Value),
     Syscall(usize),
-    Empty,
 }
 
 pub fn parse(source: String, name: &str, path: PathBuf) -> Result<Program> {
@@ -77,10 +77,6 @@ pub fn parse(source: String, name: &str, path: PathBuf) -> Result<Program> {
                         return Err(ParseError(UnexpectedToken("comment".into())))
                             .with_context(|| "Comment should be filtered out")
                     }
-                    TokenType::Empty => {
-                        return Err(ParseError(UnexpectedToken("empty".into())))
-                            .with_context(|| "Empty should be filtered out")
-                    }
                 })
             })
             .collect::<Result<Vec<_>>>()?,
@@ -91,16 +87,18 @@ pub fn parse(source: String, name: &str, path: PathBuf) -> Result<Program> {
 pub fn parse_program<'a>(input: Span<'a>) -> Result<Vec<Token>> {
     let mut input = input;
     let mut tokens = Vec::new();
-    while let Ok((rem, token)) = alt((
-        parse_comment,
-        parse_keyword,
-        parse_value,
-        parse_op,
-        parse_syscalls,
-        parse_intrinsic,
-        parse_name,
-        parse_empty,
-    ))(input)
+    while let Ok((rem, token)) = terminated(
+        alt((
+            parse_comment,
+            parse_keyword,
+            parse_syscalls,
+            parse_intrinsic,
+            parse_op,
+            parse_value,
+            parse_name,
+        )),
+        alt((multispace1, eof)),
+    )(input)
     {
         tokens.push(token);
         input = rem;
@@ -114,7 +112,6 @@ pub fn parse_program<'a>(input: Span<'a>) -> Result<Vec<Token>> {
     tokens = tokens
         .iter()
         .filter(|t| match t.ty {
-            TokenType::Empty => false,
             TokenType::Comment => false,
             _ => true,
         })
@@ -241,22 +238,6 @@ pub fn parse_hex_int<'a>(input: Span<'a>) -> IResult<Span<'a>, Token> {
     Ok((input, token))
 }
 
-pub fn parse_empty<'a>(input: Span<'a>) -> IResult<Span<'a>, Token> {
-    let (input, _) = multispace1(input)?;
-    Ok((
-        input,
-        Token {
-            value: "".to_string(),
-            location: (
-                input.extra.to_string(),
-                input.location_line() as usize,
-                input.get_column(),
-            ),
-            ty: TokenType::Empty,
-        },
-    ))
-}
-
 pub fn parse_intrinsic<'a>(input: Span<'a>) -> IResult<Span<'a>, Token> {
     let (input, instruction) = alphanumeric1(input)?;
 
@@ -282,19 +263,20 @@ pub fn parse_intrinsic<'a>(input: Span<'a>) -> IResult<Span<'a>, Token> {
 }
 
 pub fn parse_name<'a>(input: Span<'a>) -> IResult<Span<'a>, Token> {
+    let extra = input.extra.to_owned();
+    let line = input.location_line();
+    let col = input.get_column();
     let (input, (start, name_rest)) = tuple((
         alt((satisfy(|c| c.is_alphabetic()), char('_'))),
-        alphanumeric1,
+        opt(many1(alt((satisfy(|c| c.is_alphanumeric()), char('_'))))),
     ))(input)?;
-    let mut name = name_rest.fragment().to_string();
-    name.insert(0, start);
+    let mut name = vec![start];
+    if let Some(rest) = name_rest {
+        name.extend(rest);
+    }
     let token = Token {
-        value: name,
-        location: (
-            name_rest.extra.to_string(),
-            name_rest.location_line() as usize,
-            name_rest.get_column() - 1,
-        ),
+        value: name.iter().collect(),
+        location: (extra, line as usize, col - 1),
         ty: TokenType::Name,
     };
     Ok((input, token))
@@ -331,7 +313,7 @@ fn ops1<'a>(input: Span<'a>) -> IResult<Span<'a>, Span<'a>> {
         tag("*"),
         tag("/"),
         tag("%"),
-        tag("divmod"),
+        tag("mod"),
         tag("&"),
         tag("band"),
         tag("|"),
@@ -395,61 +377,3 @@ pub fn parse_comment<'a>(input: Span<'a>) -> IResult<Span<'a>, Token> {
         },
     ))
 }
-
-/* impl From<&str> for Instruction {
-    fn from(value: &str) -> Self {
-        if let Ok(val) = value.parse::<i64>() {
-            return Instruction::Push(Value::Int(val));
-        }
-        match value {
-            "+" => Instruction::Op(Op::Add),
-            "-" => Instruction::Op(Op::Sub),
-            "*" => Instruction::Op(Op::Mul),
-            "/" => Instruction::Op(Op::Div),
-            "%" | "divmod" => Instruction::Op(Op::Mod),
-            "&" | "band" => Instruction::Op(Op::BitwiseAnd),
-            "|" | "bor" => Instruction::Op(Op::BitwiseOr),
-            "^" | "bxor" => Instruction::Op(Op::BitwiseXor),
-            "~" => Instruction::Op(Op::BitwiseNot),
-            "<<" | "shl" => Instruction::Op(Op::Shl),
-            ">>" | "shr" => Instruction::Op(Op::Shr),
-            "=" => Instruction::Op(Op::Eq),
-            "!=" => Instruction::Op(Op::Neq),
-            "<" => Instruction::Op(Op::Lt),
-            ">" => Instruction::Op(Op::Gt),
-            "<=" => Instruction::Op(Op::Lte),
-            ">=" => Instruction::Op(Op::Gte),
-            "." => Instruction::Op(Op::Store),
-            "," => Instruction::Op(Op::Load),
-            "while" => Instruction::Keyword(Keyword::While {
-                self_ip: 0,
-                do_ip: 0,
-            }),
-            "do" => Instruction::Keyword(Keyword::Do { end_ip: 0 }),
-            "if" => Instruction::Keyword(Keyword::If { else_ip: 0 }),
-            "else" => Instruction::Keyword(Keyword::Else {
-                else_ip: 0,
-                end_ip: 0,
-            }),
-            "end" => Instruction::Keyword(Keyword::End {
-                self_ip: 0,
-                while_ip: None,
-            }),
-            "macro" => Instruction::Keyword(Keyword::Macro),
-            "syscall0" => Instruction::Syscall(SyscallKind::Syscall0),
-            "syscall1" => Instruction::Syscall(SyscallKind::Syscall1),
-            "syscall2" => Instruction::Syscall(SyscallKind::Syscall2),
-            "syscall3" => Instruction::Syscall(SyscallKind::Syscall3),
-            "syscall4" => Instruction::Syscall(SyscallKind::Syscall4),
-            "syscall5" => Instruction::Syscall(SyscallKind::Syscall5),
-            "syscall6" => Instruction::Syscall(SyscallKind::Syscall6),
-            name => {
-                if let Ok(intrinsic) = Intrinsic::from_str(name) {
-                    Instruction::Intrinsic(intrinsic)
-                } else {
-                    Instruction::Name(name.to_owned())
-                }
-            }
-        }
-    }
-} */

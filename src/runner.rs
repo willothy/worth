@@ -2,8 +2,9 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 
+use crate::cli::RunOptions;
 use crate::error::{Error::RunnerError, RunnerError::*};
-use crate::{cli::RunOptions, log, log::LogLevel};
+use crate::{log, log::LogLevel};
 
 pub fn run(compiled: &PathBuf, opt: RunOptions) -> Result<()> {
     log::log(
@@ -27,16 +28,16 @@ pub fn run(compiled: &PathBuf, opt: RunOptions) -> Result<()> {
         .with_context(|| format!("Failed to wait for {:?} process to complete", compiled))?;
 
     if run.status.code().unwrap_or(0) != 0 {
-        return Err(RunnerError(NonZeroStatus(
-            run.status.code().unwrap_or(0) as usize
-        )))
-        .with_context(|| {
-            format!(
-                "Program stderr:\n{}\n\nProgram stdout:\n{}\n",
-                String::from_utf8_lossy(&run.stderr),
-                String::from_utf8_lossy(&run.stdout)
-            )
-        });
+        return Err(RunnerError(NonZeroStatus(run.status.code().unwrap_or(0) as usize)).into());
+    }
+
+    // Delete executable
+    if let Err(e) = std::fs::remove_file(compiled) {
+        log::log(
+            LogLevel::Warn,
+            format!("Failed to delete executable: {}", e),
+            false,
+        );
     }
     Ok(())
 }

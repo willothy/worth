@@ -84,6 +84,8 @@ pub enum PreprocessorError {
     InvalidInclude(String),
     #[error("Invalid filename {0}")]
     InvalidFilename(String),
+    #[error("File not found {0}")]
+    IncludeNotFound(String),
 }
 
 #[derive(Error, Debug)]
