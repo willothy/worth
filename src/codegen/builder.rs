@@ -1,4 +1,4 @@
-use worthc_macros::{asm, asm_line, label};
+use crate::{asm, asm_line, label};
 
 #[derive(Debug, Clone)]
 pub struct Builder {
