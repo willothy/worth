@@ -64,6 +64,8 @@ pub enum Op {
     Gte,
     Store,
     Load,
+    Load64,
+    Store64,
     Mod,
 }
 
@@ -87,6 +89,8 @@ impl Op {
             ">" => Ok(Op::Gt),
             "<=" => Ok(Op::Lte),
             ">=" => Ok(Op::Gte),
+            ".64" => Ok(Op::Store64),
+            ",64" => Ok(Op::Load64),
             "." => Ok(Op::Store),
             "," => Ok(Op::Load),
             op => Err(ParseError(UnknownOperator))
@@ -118,6 +122,8 @@ impl std::fmt::Display for Op {
             Op::Gte => write!(f, ">="),
             Op::Store => write!(f, "."),
             Op::Load => write!(f, ","),
+            Op::Load64 => write!(f, ",64"),
+            Op::Store64 => write!(f, ".64"),
         }
     }
 }

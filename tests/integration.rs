@@ -5,8 +5,12 @@ use serial_test::serial;
 fn runner(category: &str, name: &str) {
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests");
     let file = dir.join(&category).join(&name).with_extension("porth");
-    let out_file = dir.join("tmp_test").with_extension("");
-    println!("file: {:?}", file);
+    let args_file = dir.join(&category).join(&name).with_extension("txt");
+    let args = std::fs::read_to_string(&args_file).ok();
+    let out_file = dir
+        .join("".to_string() + category + "/" + name)
+        .with_extension("");
+
     let output = test_bin::get_test_bin("worthc")
         .arg(&file)
         .args(["build", "-o"])
@@ -19,9 +23,12 @@ fn runner(category: &str, name: &str) {
         "\n\n---- Compiler Error ----\nCompiler exited with non-zero status for program:\n\n{}\n-- End Compiler Error --\n\n",
         unsafe { String::from_utf8_unchecked(output.stderr) }
     );
-    let output = Command::new(&out_file)
-        .output()
-        .expect("failed to execute process");
+    let mut output = Command::new(&out_file);
+    if let Some(args) = &args {
+        //output.arg("--");
+        output.args(args.lines().map(|s| s.trim()).collect::<Vec<&str>>());
+    }
+    let output = output.output().expect("failed to execute process");
     assert_eq!(
         output.status.success(),
         true,
@@ -31,11 +38,13 @@ fn runner(category: &str, name: &str) {
         &name,
         unsafe { String::from_utf8_unchecked(output.stdout) }
     );
-    let sim_output = test_bin::get_test_bin("worthc")
-        .arg(file)
-        .arg("S")
-        .output()
-        .expect("failed to execute process");
+    let mut sim = test_bin::get_test_bin("worthc");
+    sim.arg(file).arg("S");
+    if let Some(args) = &args {
+        sim.arg("--");
+        sim.args(args.lines().map(|s| s.trim()).collect::<Vec<&str>>());
+    }
+    let sim_output = sim.output().expect("failed to execute process");
     assert_eq!(
         sim_output.status.success(),
         true,
@@ -59,61 +68,56 @@ fn runner(category: &str, name: &str) {
 }
 
 #[test]
-#[serial]
 fn hello_world() {
     runner("programs", "hello");
 }
 
 #[test]
-#[serial]
 fn memory() {
     runner("programs", "memory");
 }
 
 #[test]
-#[serial]
 fn bitwise() {
     runner("programs", "bitwise");
 }
 
 #[test]
-#[serial]
 fn rule110() {
     runner("programs", "rule110");
 }
 
 #[test]
-#[serial]
 fn string() {
     runner("programs", "string");
 }
 
 #[test]
-#[serial]
 fn char() {
     runner("programs", "char");
 }
 
 #[test]
-#[serial]
 fn include() {
     runner("programs", "include");
 }
 
 #[test]
-#[serial]
 fn math() {
     runner("programs", "math");
 }
 
 #[test]
-#[serial]
+fn args() {
+    runner("programs", "args");
+}
+
+#[test]
 fn euler1() {
     runner("euler", "problem01");
 }
 
 #[test]
-#[serial]
 fn euler2() {
     runner("euler", "problem02");
 }

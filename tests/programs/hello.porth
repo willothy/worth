@@ -1,6 +1,6 @@
 include "../../std.porth"
 
-"Hello, World\n" stdout write
+"Hello, World\n" stdout write drop
 
 // Old method! //
 

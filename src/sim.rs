@@ -30,11 +30,39 @@ const BSS_CAPACITY: usize = 640_000;
 pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<()> {
     let Program {
         instructions: program,
+        name: program_name,
+        base_path,
         ..
     } = program;
     let mut stack = Vec::new();
-    let mut bss: Vec<u8> = vec![0; STR_CAPACITY + BSS_CAPACITY];
-    let mut str_allocated = 0;
+    let mut bss: Vec<u8> = vec![0; STR_CAPACITY + BSS_CAPACITY + 1];
+    let mut str_allocated = 1;
+    let mut args = opt.sim_args;
+    args.insert(
+        0,
+        base_path.join(program_name).to_str().unwrap().to_string(),
+    );
+
+    // Allocate strings and push arguments (char** argv) onto the stack
+    for arg in args.iter().rev() {
+        let mut arg_bytes = arg.as_bytes().to_vec();
+        arg_bytes.push(0); // null-terminate
+        let len = arg_bytes.len();
+        stack.push(str_allocated as i64);
+        bss[str_allocated..str_allocated + len].copy_from_slice(&arg_bytes);
+        str_allocated += len;
+        if str_allocated > STR_CAPACITY {
+            return Err(RuntimeError(StringCapacityExceeded)).with_context(|| {
+                format!(
+                    "String capacity exceeded: {} > {}",
+                    str_allocated, STR_CAPACITY
+                )
+            });
+        }
+    }
+
+    // Push argc onto the stack
+    stack.push(args.len() as i64);
 
     let mut fds: Vec<BinaryIO> = BinaryIO::stdio();
     let debug = opt.debug;
@@ -64,6 +92,26 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<()> {
         );
 
         match &inst {
+            Instruction::Push(val) => match val {
+                Value::Int(i) => stack.push(*i),
+                Value::Char(c) => stack.push((*c) as i64),
+                Value::Str(s) => {
+                    let len = s.as_bytes().len();
+                    stack.push(len as i64);
+                    stack.push(str_allocated as i64);
+                    bss[str_allocated..str_allocated + len].copy_from_slice(s.as_bytes());
+                    str_allocated += len;
+                    if str_allocated > STR_CAPACITY {
+                        return Err(RuntimeError(StringCapacityExceeded)).with_context(|| {
+                            format!(
+                                "String capacity exceeded: {} > {}",
+                                str_allocated, STR_CAPACITY
+                            )
+                        });
+                    }
+                }
+                Value::Ptr(_name) => todo!(),
+            },
             Instruction::Syscall(SyscallKind::Syscall0) => {
                 let syscall = pop!();
                 match syscall {
@@ -116,6 +164,7 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<()> {
                             .with_context(|| {
                                 format!("Failed to read from file descriptor {}", fd)
                             })?;
+                        stack.push(count as i64);
                     }
                     1 => {
                         // Write
@@ -144,6 +193,7 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<()> {
                             .with_context(|| {
                                 format!("Failed to flush writer for file descriptor {}", fd)
                             })?;
+                        stack.push(count as i64);
                     }
                     number => todo!("Implement syscall3 {}", number),
                 }
@@ -209,26 +259,7 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<()> {
                     continue;
                 }
             }
-            Instruction::Push(val) => match val {
-                Value::Int(i) => stack.push(*i),
-                Value::Char(c) => stack.push((*c) as i64),
-                Value::Str(s) => {
-                    let len = s.as_bytes().len();
-                    stack.push(len as i64);
-                    stack.push(str_allocated as i64);
-                    bss[str_allocated..str_allocated + len].copy_from_slice(s.as_bytes());
-                    str_allocated += len;
-                    if str_allocated > STR_CAPACITY {
-                        return Err(RuntimeError(StringCapacityExceeded)).with_context(|| {
-                            format!(
-                                "String capacity exceeded: {} > {}",
-                                str_allocated, STR_CAPACITY
-                            )
-                        });
-                    }
-                }
-                Value::Ptr(_name) => todo!(),
-            },
+
             Instruction::Intrinsic(intrinsic) => match intrinsic {
                 Intrinsic::Panic => std::process::exit(1),
                 Intrinsic::Print => {
@@ -383,6 +414,50 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<()> {
                     });
                 }
                 stack.push(bss[addr as usize] as i64);
+            }
+            Instruction::Op(Op::Store64) => {
+                let val = pop!();
+                let addr = pop!();
+                if addr > (STR_CAPACITY + BSS_CAPACITY) as i64 {
+                    return Err(RuntimeError(InvalidMemoryAccess)).with_context(|| {
+                        format!(
+                            "Invalid memory write: {:x} > {:x}",
+                            addr,
+                            STR_CAPACITY + BSS_CAPACITY
+                        )
+                    });
+                }
+                // Store 8 bytes of value to the address
+                bss[addr as usize] = (val >> 56) as u8;
+                bss[addr as usize + 1] = (val >> 48) as u8;
+                bss[addr as usize + 2] = (val >> 40) as u8;
+                bss[addr as usize + 3] = (val >> 32) as u8;
+                bss[addr as usize + 4] = (val >> 24) as u8;
+                bss[addr as usize + 5] = (val >> 16) as u8;
+                bss[addr as usize + 6] = (val >> 8) as u8;
+                bss[addr as usize + 7] = val as u8;
+            }
+            Instruction::Op(Op::Load64) => {
+                let addr = pop!();
+                if addr > (STR_CAPACITY + BSS_CAPACITY) as i64 {
+                    return Err(RuntimeError(InvalidMemoryAccess)).with_context(|| {
+                        format!(
+                            "Invalid memory read: {:x} > {:x}",
+                            addr,
+                            STR_CAPACITY + BSS_CAPACITY
+                        )
+                    });
+                }
+                // Read 8 bytes of value from the address
+                let val = (bss[addr as usize] as i64) << 56
+                    | (bss[addr as usize + 1] as i64) << 48
+                    | (bss[addr as usize + 2] as i64) << 40
+                    | (bss[addr as usize + 3] as i64) << 32
+                    | (bss[addr as usize + 4] as i64) << 24
+                    | (bss[addr as usize + 5] as i64) << 16
+                    | (bss[addr as usize + 6] as i64) << 8
+                    | bss[addr as usize + 7] as i64;
+                stack.push(val);
             }
             Instruction::Keyword(Keyword::Macro) => {
                 return Err(RuntimeError(MacroNotExpanded))

@@ -233,6 +233,21 @@ pub fn load(asm: &mut Builder) {
     );
 }
 
+pub(crate) fn load64(asm: &mut Builder) {
+    comment!(asm, "-- load64 --");
+    asm!(
+        asm,
+        /// Address to load from
+        ("pop", "rax"),
+        /// Zero out rbx
+        ("xor", "rbx, rbx"),
+        /// Load low byte into rbx
+        ("mov", "rbx, [rax]"),
+        /// Push rbx
+        ("push", "rbx")
+    );
+}
+
 pub fn store(asm: &mut Builder) {
     comment!(asm, "-- store --");
     asm!(
@@ -246,13 +261,27 @@ pub fn store(asm: &mut Builder) {
     );
 }
 
+pub fn store64(asm: &mut Builder) {
+    comment!(asm, "-- store64 --");
+    asm!(
+        asm,
+        /// Value to store
+        ("pop", "rbx"),
+        /// Address to store into
+        ("pop", "rax"),
+        /// Store low byte into address
+        ("mov", "[rax], rbx")
+    );
+}
+
 pub fn syscall0(asm: &mut Builder) {
     comment!(asm, "-- syscall0 --");
     asm!(
         asm,
         // Syscall number
         ("pop", "rax"),
-        ("syscall")
+        ("syscall"),
+        ("push", "rax")
     );
 }
 
@@ -263,7 +292,8 @@ pub fn syscall1(asm: &mut Builder) {
         /// Syscall number
         ("pop", "rax"),
         ("pop", "rdi"),
-        ("syscall")
+        ("syscall"),
+        ("push", "rax")
     );
 }
 
@@ -275,7 +305,8 @@ pub fn syscall2(asm: &mut Builder) {
         ("pop", "rax"),
         ("pop", "rdi"),
         ("pop", "rsi"),
-        ("syscall")
+        ("syscall"),
+        ("push", "rax")
     );
 }
 
@@ -288,7 +319,8 @@ pub fn syscall3(asm: &mut Builder) {
         ("pop", "rdi"),
         ("pop", "rsi"),
         ("pop", "rdx"),
-        ("syscall")
+        ("syscall"),
+        ("push", "rax")
     );
 }
 
@@ -302,7 +334,8 @@ pub fn syscall4(asm: &mut Builder) {
         ("pop", "rsi"),
         ("pop", "rdx"),
         ("pop", "r10"),
-        ("syscall")
+        ("syscall"),
+        ("push", "rax")
     );
 }
 
@@ -317,7 +350,8 @@ pub fn syscall5(asm: &mut Builder) {
         ("pop", "rdx"),
         ("pop", "r10"),
         ("pop", "r8"),
-        ("syscall")
+        ("syscall"),
+        ("push", "rax")
     );
 }
 
@@ -333,6 +367,7 @@ pub fn syscall6(asm: &mut Builder) {
         ("pop", "r10"),
         ("pop", "r8"),
         ("pop", "r9"),
-        ("syscall")
+        ("syscall"),
+        ("push", "rax")
     );
 }

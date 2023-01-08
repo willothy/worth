@@ -18,7 +18,7 @@ use nom::{
     },
     combinator::eof,
     multi::{many0, many1},
-    sequence::{delimited, preceded, terminated},
+    sequence::{delimited, preceded},
     IResult,
 };
 use nom_locate::LocatedSpan;
@@ -213,7 +213,9 @@ pub fn parse_char<'a>(input: Span<'a>) -> IResult<Span<'a>, Token> {
 pub fn special_char<'a>(input: Span<'a>) -> IResult<Span<'a>, char> {
     let (input, c) = preceded(
         char('\\'),
-        satisfy(|c| c == 'n' || c == 'r' || c == 't' || c == '\\' || c == '\'' || c == '"'),
+        satisfy(|c| {
+            c == 'n' || c == 'r' || c == 't' || c == '\\' || c == '\'' || c == '"' || c == '0'
+        }),
     )(input)?;
     match c {
         'n' => Ok((input, '\n')),
@@ -222,6 +224,7 @@ pub fn special_char<'a>(input: Span<'a>) -> IResult<Span<'a>, char> {
         '\\' => Ok((input, '\\')),
         '\'' => Ok((input, '\'')),
         '"' => Ok((input, '"')),
+        '0' => Ok((input, '\0')),
         _ => Err(nom::Err::Error(nom::error::Error::new(
             input,
             nom::error::ErrorKind::Tag,
@@ -363,6 +366,8 @@ fn ops2<'a>(input: Span<'a>) -> IResult<Span<'a>, Span<'a>> {
         tag("<"),
         tag(">"),
         tag("="),
+        tag(",64"),
+        tag(".64"),
         tag("."),
         tag(","),
     ))(input)?;

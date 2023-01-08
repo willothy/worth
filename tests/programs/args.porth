@@ -1,0 +1,18 @@
+include "../../std.porth"
+
+// Stack at entry:
+// ... argv[1] rgv[0] argc
+
+//drop
+//dup strlen swap stdout write drop
+//"\n" stdout write drop
+//dup print dup strlen swap stdout write drop
+
+
+// argv argc
+while dup 0 > do
+    swap dup strlen swap
+    stdout write drop
+    "\n" stdout write drop
+    1 -
+end

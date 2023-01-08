@@ -134,6 +134,8 @@ pub fn compile(program: &Program, opt: CompilerOptions) -> Result<PathBuf> {
             Instruction::Op(Op::Gte) => ops::gte(&mut asm),
             Instruction::Op(Op::Load) => ops::load(&mut asm),
             Instruction::Op(Op::Store) => ops::store(&mut asm),
+            Instruction::Op(Op::Load64) => ops::load64(&mut asm),
+            Instruction::Op(Op::Store64) => ops::store64(&mut asm),
             Instruction::Syscall(SyscallKind::Syscall0) => ops::syscall0(&mut asm),
             Instruction::Syscall(SyscallKind::Syscall1) => ops::syscall1(&mut asm),
             Instruction::Syscall(SyscallKind::Syscall2) => ops::syscall2(&mut asm),

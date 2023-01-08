@@ -1,11 +1,11 @@
 include "../../std.porth"
 
-"Hello, world!" stdout write
-"Hello, world!\n" stdout write
-"Hello, world!\r\n" stdout write
-"\tHello, world!" stdout write
-"\"Hello, world!\"" stdout write
-"Hello, world!\n" stdout write
+"Hello, world!" stdout write drop
+"Hello, world!\n" stdout write drop
+"Hello, world!\r\n" stdout write drop
+"\tHello, world!" stdout write drop
+"\"Hello, world!\"" stdout write drop
+"Hello, world!\n" stdout write drop
 "Hello, wo
 
-rld!\n" stdout write
+rld!\n" stdout write drop

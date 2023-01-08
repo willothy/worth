@@ -25,5 +25,5 @@ end
 1 memread 1 + 1 memset
 2 memread 1 + 2 memset
 
-5 mem stdout write
+5 mem stdout write drop
 
