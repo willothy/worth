@@ -86,6 +86,10 @@ pub enum PreprocessorError {
     InvalidFilename(String),
     #[error("File not found {0}")]
     IncludeNotFound(String),
+    #[error("Encountered recursive macro")]
+    TooManyMacroExpansions,
+    #[error("Recursive include")]
+    RecursiveInclude,
 }
 
 #[derive(Error, Debug)]

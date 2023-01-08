@@ -117,16 +117,3 @@ fn euler1() {
 fn euler2() {
     runner("euler", "problem02");
 }
-
-/* #[test]
-#[serial]
-fn euler4() {
-    runner("euler", "problem04");
-}
- */
-/* #[test]
-#[serial]
-fn euler5() {
-    runner("euler", "problem05");
-}
- */

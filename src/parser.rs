@@ -16,9 +16,9 @@ use nom::{
     character::complete::{
         alphanumeric1, char, digit1, hex_digit1, multispace0, multispace1, satisfy,
     },
-    combinator::{eof, opt},
+    combinator::eof,
     multi::{many0, many1},
-    sequence::{delimited, preceded, terminated, tuple},
+    sequence::{delimited, preceded, terminated},
     IResult,
 };
 use nom_locate::LocatedSpan;
@@ -87,7 +87,8 @@ pub fn parse(source: String, name: &str, path: PathBuf) -> Result<Program> {
 pub fn parse_program<'a>(input: Span<'a>) -> Result<Vec<Token>> {
     let mut input = input;
     let mut tokens = Vec::new();
-    while let Ok((rem, token)) = terminated(
+    while let Ok((rem, token)) = delimited(
+        multispace0,
         alt((
             parse_comment,
             parse_keyword,

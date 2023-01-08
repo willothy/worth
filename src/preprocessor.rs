@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::path::PathBuf;
 
 use crate::error::{Error::PreprocessorError, PreprocessorError::*};
@@ -6,7 +5,7 @@ use crate::instruction::{Instruction, Keyword, Macro, Program, Value};
 use anyhow::{Context, Result};
 
 pub fn process(mut program: Program) -> Result<Program> {
-    includes(&mut program).context(format!(
+    includes(&mut program, 0).context(format!(
         "Failed to process includes for {}.porth",
         program.name
     ))?;
@@ -14,11 +13,17 @@ pub fn process(mut program: Program) -> Result<Program> {
         "Failed to process macros for {}.porth",
         program.name
     ))?;
+    let mut depth = 0;
     while expand_macros(&mut program).context(format!(
         "Failed to process macros for {}.porth",
         program.name
     ))? == true
-    {}
+    {
+        if depth >= 100 {
+            return Err(PreprocessorError(TooManyMacroExpansions).into());
+        }
+        depth += 1;
+    }
     jumps(&mut program).context(format!(
         "Failed to process jumps for {}.porth",
         program.name
@@ -26,19 +31,17 @@ pub fn process(mut program: Program) -> Result<Program> {
     Ok(program)
 }
 
-fn process_include(program: &mut Program) -> Result<()> {
-    includes(program)?;
-    Ok(())
-}
-
-fn includes(program: &mut Program) -> Result<()> {
+fn includes(program: &mut Program, depth: usize) -> Result<()> {
     // TODO: Safety method for recursive includes
     // TODO: Search path for includes
     let mut include_paths = Vec::new();
     let mut inst_to_remove = Vec::new();
 
     let mut instructions = program.instructions.iter().enumerate();
-
+    if depth > 100 {
+        return Err(PreprocessorError(RecursiveInclude))
+            .with_context(|| format!("Invalid include"));
+    }
     // Collect includes
     loop {
         let Some((ip, instruction)) = instructions.next() else {
@@ -75,7 +78,21 @@ fn includes(program: &mut Program) -> Result<()> {
 
     // Process includes
     let base_path = program.base_path.clone();
-    for include in include_paths {
+    for include in &mut include_paths {
+        let include_path = base_path.join(&include);
+        if !include_path.exists() {
+            return Err(PreprocessorError(IncludeNotFound(
+                include.clone().to_string_lossy().to_string(),
+            )))
+            .with_context(|| format!("Invalid include {:?}", include));
+        }
+        let include_path = include_path
+            .canonicalize()
+            .with_context(|| format!("Failed to canonicalize include path {:?}", include))?;
+        *include = include_path;
+    }
+
+    for include in &include_paths {
         let include_path = base_path.join(&include);
         if !include_path.exists() {
             return Err(PreprocessorError(IncludeNotFound(
@@ -99,8 +116,8 @@ fn includes(program: &mut Program) -> Result<()> {
             ))?
             .to_string_lossy()
             .to_string();
-        let mut include_program = crate::parser::parse(include_file, &name, include_path)?;
-        process_include(&mut include_program)?;
+        let mut include_program = crate::parser::parse(include_file, &name, include_path.clone())?;
+        includes(&mut include_program, depth + 1)?;
 
         program
             .instructions
