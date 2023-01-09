@@ -36,7 +36,7 @@ impl Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Value::Int(value) => write!(f, "{}", value),
-            Value::Str(value) => write!(f, "{}", value),
+            Value::Str(value) => write!(f, "{}", snailquote::escape(value)),
             Value::Char(value) => write!(f, "{}", value),
             Value::Ptr(value) => write!(f, "{}", value),
         }
@@ -75,7 +75,8 @@ impl Op {
             "+" => Ok(Op::Add),
             "-" => Ok(Op::Sub),
             "*" => Ok(Op::Mul),
-            //"/" => Ok(Op::Div),
+            "/" | "div" => Ok(Op::Div),
+            "%" | "mod" => Ok(Op::Mod),
             "divmod" => Ok(Op::DivMod),
             "&" | "band" => Ok(Op::BitwiseAnd),
             "|" | "bor" => Ok(Op::BitwiseOr),
@@ -231,7 +232,7 @@ impl std::fmt::Display for Instruction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Instruction::Push(Value::Int(i)) => write!(f, "{}", i),
-            Instruction::Push(Value::Str(s)) => write!(f, "\"{}\"", s),
+            Instruction::Push(Value::Str(s)) => write!(f, "{}", snailquote::escape(s)),
             Instruction::Push(Value::Char(c)) => write!(f, "'{}'", c),
             Instruction::Push(Value::Ptr(s)) => write!(f, "{}", s),
             Instruction::Intrinsic(i) => write!(f, "{}", i),

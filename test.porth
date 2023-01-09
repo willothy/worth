@@ -1,4 +1,2 @@
 include "std.porth"
 
-argv ,64 dup strlen swap stdout write drop
-"\n" stdout write drop

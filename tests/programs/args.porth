@@ -3,15 +3,16 @@ include "../../std.porth"
 //10 argv ,64 print //stdout write drop
 //print
 
-argv argc
+argv
+argc 
 while dup 0 > do
-    over ,64 cast(ptr) dup strlen swap
-    stdout write drop
-    "\n" stdout write drop
-    1 - swap 8 + swap
+  over ,64 dup cast(ptr) strlen swap
+  stdout write drop
+  "\n" stdout write drop
+  1 - swap 8 + swap
 end
-drop // argc
-drop // argv
+drop
+drop
 
 ///////////////////////////////////
 

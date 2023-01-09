@@ -27,25 +27,48 @@ impl Display for ValType {
     }
 }
 
+fn err_loc(program: &Program, ip: usize) -> String {
+    let spread_len = 6;
+    let start = if spread_len > ip { 0 } else { ip - spread_len };
+    let end = (ip + spread_len).min(program.instructions.len());
+    let spread = start..end;
+    let output = program.instructions[spread.clone()]
+        .iter()
+        .enumerate()
+        .map(|(idx, i)| {
+            if idx == spread.len() / 2 {
+                format!("\x1b[31m>>> {}\x1b[0m", i.to_string())
+            } else {
+                i.to_string()
+            }
+        })
+        .collect::<Vec<_>>();
+    output.join(" ")
+}
+
 pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
     use ValType::*;
-    let Program {
-        instructions: program,
-        ..
-    } = program;
+    let Program { instructions, .. } = program;
 
     let mut stack = vec![]; // Start with int for argc and a ptr for argv
     let mut snapshots = Vec::new();
 
     let mut ip = 0;
-    while ip < program.len() {
-        let inst = &program[ip];
+    while ip < instructions.len() {
+        let inst = &instructions[ip];
         macro_rules! pop {
             () => {
                 stack
                     .pop()
                     .ok_or(TypecheckError(StackUnderflow))
-                    .with_context(|| format!("Stack underflow at instruction {}: {}", ip, inst))?
+                    .with_context(|| {
+                        format!(
+                            "Stack underflow at instruction {}: {}\n\n{}",
+                            ip,
+                            inst,
+                            err_loc(&program, ip)
+                        )
+                    })?
             };
         }
         macro_rules! expect {
@@ -55,10 +78,11 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                     return Err(TypecheckError(InvalidTypeForOp(inst.to_string()))).with_context(
                         || {
                             format!(
-                                "Invalid type for {}: Expected {}, got {}.",
+                                "Invalid type for {}: Expected {}, got {}.\n\n{}",
                                 inst,
                                 casey::lower!(stringify!($expect)),
-                                v
+                                v,
+                                err_loc(&program, ip)
                             )
                         },
                     );
@@ -75,10 +99,11 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                         return Err(TypecheckError(InvalidTypeForOp(inst.to_string()))).with_context(
                             || {
                                 format!(
-                                    "Invalid type for {}: Expected {}, got {}.",
+                                    "Invalid type for {}: Expected {}, got {}.\n\n{}",
                                     inst,
                                     casey::lower!(stringify!($($expect)or+)),
-                                    v
+                                    v,
+                                    err_loc(&program, ip)
                                 )
                             },
                         );
@@ -120,10 +145,11 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                 if stack.len() < $num {
                     return Err(TypecheckError(StackUnderflow)).with_context(|| {
                         format!(
-                            "Not enough arguments for {}: Expected {} items, got {}.",
+                            "Not enough arguments for {}: Expected {} items, got {}.\n\n{}",
                             inst,
                             $num,
-                            stack.len()
+                            stack.len(),
+                            err_loc(&program, ip)
                         )
                     });
                 }
@@ -163,8 +189,8 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                             return Err(TypecheckError(InvalidTypeForOp(inst.to_string())))
                                 .with_context(|| {
                                     format!(
-                                        "Invalid type for {}: Expected int or ptr, got {} and {}.",
-                                        inst, illegal_a, illegal_b
+                                        "Invalid type for {}: Expected int or ptr, got {} and {}.\n\n{}",
+                                        inst, illegal_a, illegal_b, err_loc(&program, ip)
                                     )
                                 });
                         }
@@ -174,7 +200,6 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                     let (a, b) = tc!(expect: (Int, Ptr, Char, Bool), (Int, Ptr, Char, Bool));
                     match (a, b) {
                         (Int, Int) => stack.push(Int),
-                        (Int, Ptr) => stack.push(Ptr),
                         (Ptr, Int) => stack.push(Ptr),
                         (Char, Int) => stack.push(Char),
                         (Int, Char) => stack.push(Int),
@@ -184,8 +209,8 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                             return Err(TypecheckError(InvalidTypeForOp(inst.to_string())))
                                 .with_context(|| {
                                     format!(
-                                        "Invalid type for {}: Expected int or ptr, got {} and {}.",
-                                        inst, illegal_a, illegal_b
+                                        "Invalid type for {}: Expected int or ptr, got {} and {}.\n\n{}",
+                                        inst, illegal_a, illegal_b, err_loc(&program, ip)
                                     )
                                 });
                         }
@@ -216,8 +241,8 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                             return Err(TypecheckError(InvalidTypeForOp(inst.to_string())))
                                 .with_context(|| {
                                     format!(
-                                        "Invalid type for {}: Expected int or bool, got {} and {}.",
-                                        inst, illegal_a, illegal_b
+                                        "Invalid type for {}: Expected int or bool, got {} and {}.\n\n{}",
+                                        inst, illegal_a, illegal_b, err_loc(&program, ip)
                                     )
                                 });
                         }
@@ -239,8 +264,8 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                             return Err(TypecheckError(InvalidTypeForOp(inst.to_string())))
                                 .with_context(|| {
                                     format!(
-                                        "Invalid type for {}: Expected int or bool, got {} and {}.",
-                                        inst, illegal_a, illegal_b
+                                        "Invalid type for {}: Expected int or bool, got {} and {}.\n\n{}",
+                                        inst, illegal_a, illegal_b, err_loc(&program, ip)
                                     )
                                 });
                         }
@@ -262,8 +287,8 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                             return Err(TypecheckError(InvalidTypeForOp(inst.to_string())))
                                 .with_context(|| {
                                     format!(
-                                        "Invalid type for {}: Expected int or bool, got {} and {}.",
-                                        inst, illegal_a, illegal_b
+                                        "Invalid type for {}: Expected int or bool, got {} and {}.\n\n{}",
+                                        inst, illegal_a, illegal_b, err_loc(&program, ip)
                                     )
                                 });
                         }
@@ -273,7 +298,7 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                     let t = tc!(expect: (Int, Bool));
                     match t {
                         Int => stack.push(Int),
-                        Char => stack.push(Ptr),
+                        Char => stack.push(Char),
                         Ptr => panic!(),
                         Str => panic!(),
                         Bool => stack.push(Bool),
@@ -308,8 +333,8 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                             return Err(TypecheckError(InvalidTypeForOp(inst.to_string())))
                                 .with_context(|| {
                                     format!(
-                                        "Invalid type for {}: Expected int or ptr, got {} and {}.",
-                                        inst, illegal_a, illegal_b
+                                        "Invalid type for {}: Expected int or ptr, got {} and {}.\n\n{}",
+                                        inst, illegal_a, illegal_b, err_loc(&program, ip)
                                     )
                                 });
                         }
@@ -338,8 +363,8 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                             return Err(TypecheckError(InvalidTypeForOp(inst.to_string())))
                                 .with_context(|| {
                                     format!(
-                                        "Invalid type for {}: Expected int or ptr, got {} and {}.",
-                                        inst, illegal_a, illegal_b
+                                        "Invalid type for {}: Expected int or ptr, got {} and {}.\n\n{}",
+                                        inst, illegal_a, illegal_b, err_loc(&program, ip)
                                     )
                                 });
                         }
@@ -357,8 +382,8 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                             return Err(TypecheckError(InvalidTypeForOp(inst.to_string())))
                                 .with_context(|| {
                                     format!(
-                                        "Invalid type for {}: Expected int or ptr, got {} and {}.",
-                                        inst, illegal_a, illegal_b
+                                        "Invalid type for {}: Expected int or ptr, got {} and {}.\n\n{}",
+                                        inst, illegal_a, illegal_b, err_loc(&program, ip)
                                     )
                                 });
                         }
@@ -376,8 +401,8 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                             return Err(TypecheckError(InvalidTypeForOp(inst.to_string())))
                                 .with_context(|| {
                                     format!(
-                                        "Invalid type for {}: Expected int or ptr, got {} and {}.",
-                                        inst, illegal_a, illegal_b
+                                        "Invalid type for {}: Expected int or ptr, got {} and {}.\n\n{}",
+                                        inst, illegal_a, illegal_b, err_loc(&program, ip)
                                     )
                                 });
                         }
@@ -395,8 +420,8 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                             return Err(TypecheckError(InvalidTypeForOp(inst.to_string())))
                                 .with_context(|| {
                                     format!(
-                                        "Invalid type for {}: Expected int or ptr, got {} and {}.",
-                                        inst, illegal_a, illegal_b
+                                        "Invalid type for {}: Expected int or ptr, got {} and {}.\n\n{}",
+                                        inst, illegal_a, illegal_b, err_loc(&program, ip)
                                     )
                                 });
                         }
@@ -414,18 +439,18 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                             return Err(TypecheckError(InvalidTypeForOp(inst.to_string())))
                                 .with_context(|| {
                                     format!(
-                                        "Invalid type for {}: Expected int or ptr, got {} and {}.",
-                                        inst, illegal_a, illegal_b
+                                        "Invalid type for {}: Expected int or ptr, got {} and {}.\n\n{}",
+                                        inst, illegal_a, illegal_b, err_loc(&program, ip)
                                     )
                                 });
                         }
                     }
                 }
                 Op::Store => {
-                    tc!(expect: (Ptr, Int, Char, Bool), Ptr);
+                    tc!(expect: (Int, Char, Bool), Ptr);
                 }
                 Op::Store64 => {
-                    tc!(expect: (Ptr, Int, Char, Bool), Ptr);
+                    tc!(expect: (Int, Char, Bool), Ptr);
                 }
                 Op::Load => {
                     tc!(expect: Ptr);
@@ -435,7 +460,26 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                     tc!(expect: Ptr);
                     stack.push(Int);
                 }
-                Op::Mod => todo!(),
+                Op::Mod => {
+                    let (a, b) = tc!(expect: (Int, Char, Ptr), (Int, Char));
+                    match (a, b) {
+                        (Int, Int) => stack.push(Int),
+                        (Char, Char) => stack.push(Char),
+                        (Char, Int) => stack.push(Char),
+                        (Int, Char) => stack.push(Int),
+                        (Ptr, Int) => stack.push(Ptr),
+                        (Ptr, Char) => stack.push(Ptr),
+                        (illegal_a, illegal_n) => {
+                            return Err(TypecheckError(InvalidTypeForOp(inst.to_string())))
+                                .with_context(|| {
+                                    format!(
+                                        "Invalid type for {}: Expected (int | char | ptr) and (int | char), got {} and {}.\n\n{}",
+                                        inst, illegal_a, illegal_n, err_loc(&program, ip)
+                                    )
+                                });
+                        }
+                    }
+                }
             },
             Instruction::Intrinsic(i) => match i {
                 Intrinsic::Argc => tc!(push: Int),
@@ -476,6 +520,9 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                 Intrinsic::CastPtr => {
                     tc!(expect: Int => push: Ptr);
                 }
+                Intrinsic::CastInt => {
+                    tc!(expect: (Char, Ptr, Bool) => push: Int);
+                }
             },
             Instruction::Keyword(kw) => match kw {
                 Keyword::While { .. } => {
@@ -487,7 +534,7 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                         },
                     ));
                 }
-                Keyword::Do { end_ip } => {
+                Keyword::Do { .. } => {
                     tc!(expect: Bool);
                     let (stack_snapshot, op_type) = snapshots
                         .pop()
@@ -497,15 +544,19 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                         if stack != stack_snapshot {
                             return Err(TypecheckError(InvalidLoop)).with_context(|| {
                                 format!(
-                                    "Expected types {:?}, got {:?}. A while loop cannot modify the stack.",
-                                    stack_snapshot, stack
+                                    "Expected types {:?}, got {:?}. A while loop cannot modify the stack.\n\n{}",
+                                    stack_snapshot, stack, err_loc(&program, ip)
                                 )
                             });
                         }
                         snapshots.push((stack.clone(), Keyword::Do { end_ip: 0 }));
                     } else {
                         return Err(TypecheckError(InvalidLoop)).with_context(|| {
-                            format!("Invalid do: Expected while, got {:?}", op_type)
+                            format!(
+                                "Invalid do: Expected while, got {:?}\n\n{}",
+                                op_type,
+                                err_loc(&program, ip)
+                            )
                         });
                     }
                 }
@@ -517,7 +568,12 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                     let (stack_snapshot, op_type) = snapshots
                         .pop()
                         .ok_or(TypecheckError(InvalidElse))
-                        .with_context(|| format!("Invalid else: No stack snapshot available"))?;
+                        .with_context(|| {
+                            format!(
+                                "Invalid else: No stack snapshot available: \n\n{}",
+                                err_loc(&program, ip)
+                            )
+                        })?;
                     if let Keyword::If { .. } = op_type {
                         snapshots.push((
                             std::mem::replace(&mut stack, stack_snapshot),
@@ -528,7 +584,11 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                         ));
                     } else {
                         return Err(TypecheckError(InvalidElse)).with_context(|| {
-                            format!("Invalid else: Expected if, got {:?}", op_type)
+                            format!(
+                                "Invalid else: Expected if, got {:?}\n\n{}",
+                                op_type,
+                                err_loc(&program, ip)
+                            )
                         });
                     }
                 }
@@ -541,8 +601,8 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                         if stack != expected_stack {
                             return Err(TypecheckError(InvalidEnd)).with_context(|| {
                                 format!(
-                                    "Expected types {:?}, got {:?}. A while loop cannot modify the stack.",
-                                    expected_stack, stack
+                                    "Expected types {:?}, got {:?}. A while loop cannot modify the stack.\n\n{}",
+                                    expected_stack, stack, err_loc(&program, ip)
                                 )
                             });
                         }
@@ -550,8 +610,8 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                         if stack != expected_stack {
                             return Err(TypecheckError(InvalidEnd)).with_context(|| {
                                 format!(
-                                    "Expected types {:?}, got {:?}. An elseless if statement cannot modify the stack.",
-                                    expected_stack, stack
+                                    "Expected types {:?}, got {:?}. An elseless if statement cannot modify the stack.\n\n{}",
+                                    expected_stack, stack, err_loc(&program, ip)
                                 )
                             });
                         }
@@ -559,8 +619,8 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                         if stack != expected_stack {
                             return Err(TypecheckError(InvalidEnd)).with_context(|| {
                                 format!(
-                                    "Expected types {:?}, got {:?}. Both branches of an if statement must push the same types to the stack",
-                                    expected_stack, stack
+                                    "Expected types {:?}, got {:?}. Both branches of an if statement must push the same types to the stack\n\n{}",
+                                    expected_stack, stack, err_loc(&program, ip)
                                 )
                             });
                         }
@@ -569,12 +629,21 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                     }
                 }
                 Keyword::Macro => {
-                    return Err(TypecheckError(MacroInCode))
-                        .with_context(|| format!("Unexpected macro in code at instruction {}", ip))
+                    return Err(TypecheckError(MacroInCode)).with_context(|| {
+                        format!(
+                            "Unexpected macro in code at instruction {}\n\n{}",
+                            ip,
+                            err_loc(&program, ip)
+                        )
+                    })
                 }
                 Keyword::Include => {
                     return Err(TypecheckError(IncludeInCode)).with_context(|| {
-                        format!("Unexpected include in code at instruction {}", ip)
+                        format!(
+                            "Unexpected include in code at instruction {}\n\n{}",
+                            ip,
+                            err_loc(&program, ip)
+                        )
                     })
                 }
             },

@@ -51,7 +51,9 @@ fn main() -> Result<()> {
     } else {
         false
     };
-    typecheck::typecheck(&program, tc_debugger)?;
+    if !args.unsafe_ {
+        typecheck::typecheck(&program, tc_debugger)?;
+    }
 
     match args.command {
         Commands::Build(opt) => {

@@ -5,6 +5,8 @@ use clap::{Parser, ValueEnum};
 #[derive(Debug, Parser)]
 pub struct Cli {
     pub file: PathBuf,
+    #[clap(short, long = "unsafe", help = "Disables typechecking")]
+    pub unsafe_: bool,
     #[clap(subcommand)]
     pub command: Commands,
 }
@@ -69,6 +71,8 @@ pub struct SimulatorOptions {
     pub tc_debug: bool,
     #[clap(short = 's', long)]
     pub step: bool,
+    #[clap(short = 'b', long)]
+    pub breakpoint: Option<usize>,
     #[clap(
         long_help = "Arguments to pass to the program, use -- to separate them from the compiler arguments.\nExample: ./worthc test.porth run -d -- arg1 arg2."
     )]

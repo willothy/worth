@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::io::{self, BufRead, BufReader, Write};
 
 use crate::error::{Error::RuntimeError, RuntimeError::*};
@@ -31,8 +30,8 @@ const BSS_CAPACITY: usize = 640_000;
 const NULL_PTR_PADDING: usize = 1;
 const MEM_LIMIT: usize = NULL_PTR_PADDING + STR_CAPACITY + ARGV_CAPACITY + BSS_CAPACITY;
 
-pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<()> {
-    let debug = opt.debug;
+pub fn simulate(program: &Program, mut opt: SimulatorOptions) -> Result<()> {
+    let mut debug = opt.debug;
     let Program {
         instructions: program,
         name: program_name,
@@ -94,8 +93,22 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<()> {
         }
     }
 
+    if let Some(breakpoint) = opt.breakpoint {
+        log::log(
+            Info,
+            format!("Breakpoint at instruction {}", breakpoint),
+            debug,
+        );
+    }
+
     let mut ip = 0;
     while ip < program.len() {
+        if let Some(breakpoint) = opt.breakpoint {
+            if breakpoint == ip {
+                log::log(Info, format!("Breakpoint reached"), debug);
+                opt.step = true;
+            }
+        }
         macro_rules! pop {
             () => {
                 stack
@@ -355,6 +368,7 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<()> {
                     stack.push(argv_buf_ptr as i64);
                 }
                 Intrinsic::CastPtr => {}
+                Intrinsic::CastInt => {}
                 #[allow(unreachable_patterns)]
                 intrinsic => todo!("Implement intrinsic {}", intrinsic),
             },
@@ -377,6 +391,11 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<()> {
                 let a = pop!();
                 let b = pop!();
                 stack.push(b / a);
+            }
+            Instruction::Op(Op::Mod) => {
+                let a = pop!();
+                let b = pop!();
+                stack.push(b % a);
             }
             Instruction::Op(Op::DivMod) => {
                 let a = pop!();
@@ -519,7 +538,14 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<()> {
         if opt.step {
             println!("{}: {:?}", ip, inst);
             println!("Stack: {:?}", stack);
-            std::io::stdin().read_line(&mut String::new()).unwrap();
+            let mut cmd = String::new();
+            std::io::stdin().read_line(&mut cmd).unwrap();
+            match cmd.trim() {
+                "c" => opt.step = false,
+                "d" => debug = !debug,
+                "q" => break,
+                _ => {}
+            }
         }
         ip += 1;
     }
