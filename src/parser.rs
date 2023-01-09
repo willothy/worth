@@ -42,7 +42,8 @@ pub enum TokenType {
 }
 
 pub fn parse(source: String, name: &str, path: PathBuf) -> Result<Program> {
-    let source = Span::new_extra(source.as_str(), name);
+    let fname = name.to_string() + ".porth";
+    let source = Span::new_extra(source.as_str(), &fname);
     let tokens = parse_program(source)?;
 
     Ok(Program {

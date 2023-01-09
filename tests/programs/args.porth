@@ -1,8 +1,5 @@
 include "../../std.porth"
 
-//10 argv ,64 print //stdout write drop
-//print
-
 argv
 argc 
 while dup 0 > do

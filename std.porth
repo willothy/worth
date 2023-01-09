@@ -338,4 +338,3 @@ macro strlen
   end
   drop
 end
-

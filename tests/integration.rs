@@ -1,12 +1,44 @@
-use std::{path::PathBuf, process::Command};
+use std::{
+    path::PathBuf,
+    process::{Command, Stdio},
+};
+
+use std::io::Write;
 
 use serial_test::serial;
+
+struct TestData {
+    stdin: String,
+    args: Vec<String>,
+}
+
+fn parse_in_file(file: &PathBuf) -> Option<TestData> {
+    let Some(contents) = std::fs::read_to_string(file).ok() else {
+        return None;
+    };
+    let mut args: Vec<String> = snailquote::escape(contents.lines().nth(0).unwrap())
+        .split_whitespace()
+        .map(|x| x.to_string())
+        .collect();
+    let mut stdin: String = contents
+        .lines()
+        .skip(1)
+        .map(|x| x.to_string())
+        .collect::<Vec<String>>()
+        .join("\n");
+    Some(TestData { args, stdin })
+}
 
 fn runner(category: &str, name: &str) {
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests");
     let file = dir.join(&category).join(&name).with_extension("porth");
     let args_file = dir.join(&category).join(&name).with_extension("txt");
-    let args = std::fs::read_to_string(&args_file).ok();
+    let test_data = parse_in_file(&args_file);
+    let (args, stdin) = if let Some(test_data) = test_data {
+        (Some(test_data.args), Some(test_data.stdin))
+    } else {
+        (None, None)
+    };
     let out_file = dir
         .join("".to_string() + category + "/" + name)
         .with_extension("");
@@ -27,9 +59,20 @@ fn runner(category: &str, name: &str) {
     let mut output = Command::new(&out_file);
     if let Some(args) = &args {
         //output.arg("--");
-        output.args(args.lines().map(|s| s.trim()).collect::<Vec<&str>>());
+        output.args(args);
     }
-    let output = output.output().expect("failed to execute process");
+    let mut handle = output
+        .stdout(Stdio::piped())
+        .stdin(Stdio::piped())
+        .spawn()
+        .expect("failed to execute process");
+    if let Some(stdin) = &stdin {
+        handle.stdin.as_mut().unwrap().write_all(stdin.as_bytes());
+    }
+    let output = handle
+        .wait_with_output()
+        .expect("failed to execute process");
+
     assert_eq!(
         output.status.success(),
         true,
@@ -43,9 +86,20 @@ fn runner(category: &str, name: &str) {
     sim.arg(file).arg("S");
     if let Some(args) = &args {
         sim.arg("--");
-        sim.args(args.lines().map(|s| s.trim()).collect::<Vec<&str>>());
+        sim.args(args);
     }
-    let sim_output = sim.output().expect("failed to execute process");
+    let mut handle = sim
+        .stdout(Stdio::piped())
+        .stdin(Stdio::piped())
+        .spawn()
+        .expect("failed to execute process");
+    if let Some(stdin) = &stdin {
+        handle.stdin.as_mut().unwrap().write_all(stdin.as_bytes());
+    }
+    let sim_output = handle
+        .wait_with_output()
+        .expect("failed to wait for process");
+
     assert_eq!(
         sim_output.status.success(),
         true,
@@ -111,6 +165,11 @@ fn math() {
 #[test]
 fn args() {
     runner("programs", "args");
+}
+
+#[test]
+fn name() {
+    runner("programs", "name");
 }
 
 #[test]
