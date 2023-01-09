@@ -135,6 +135,7 @@ pub fn simulate(program: &Program, mut opt: SimulatorOptions) -> Result<()> {
             InstructionKind::Push(val) => match val {
                 Value::Int(i) => stack.push(*i),
                 Value::Char(c) => stack.push((*c) as i64),
+                Value::Bool(b) => stack.push(*b as i64),
                 Value::Str(s) => {
                     let len = s.as_bytes().len();
                     stack.push(len as i64);

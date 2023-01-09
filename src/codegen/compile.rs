@@ -50,10 +50,15 @@ pub fn compile(program: &Program, opt: CompilerOptions) -> Result<PathBuf> {
     } = program;
 
     for inst in program {
+        asm.tmp_here +=
+            &(inst.loc.0.clone() + ":" + &inst.loc.1.to_string() + ":" + &inst.loc.2.to_string());
         match &inst.kind {
             InstructionKind::Push(val) => match val {
                 Value::Int(i) => {
                     asm!(asm, ("push", "{}", i))
+                }
+                Value::Bool(b) => {
+                    asm!(asm, ("push", "{}", *b as i64))
                 }
                 Value::Char(c) => {
                     asm!(asm, ("push", "{}", c))

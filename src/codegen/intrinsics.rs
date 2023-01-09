@@ -28,7 +28,9 @@ impl Display for Intrinsic {
     }
 }
 
-pub fn here(asm: &mut Builder) {}
+pub fn here(asm: &mut Builder) {
+    comment!(asm, "-- {} --", asm.tmp_here);
+}
 
 pub fn castptr(asm: &mut Builder) {
     comment!(asm, "-- Cast to Pointer --");

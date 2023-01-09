@@ -5,9 +5,10 @@ pub struct Builder {
     bss: Segment,
     text: Segment,
     data: Segment,
+    const_str_counter: usize,
     pub insert_segment: SegmentKind,
     pub insert_point: InsertPoint,
-    const_str_counter: usize,
+    pub tmp_here: String,
 }
 
 #[derive(Debug, Clone)]
@@ -52,6 +53,7 @@ impl Builder {
             insert_segment: SegmentKind::Bss,
             insert_point: InsertPoint::End,
             const_str_counter: 0,
+            tmp_here: String::new(),
         };
         tmp
     }

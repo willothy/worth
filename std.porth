@@ -3,6 +3,8 @@ macro stdin  0 end
 macro stdout 1 end
 macro stderr 2 end
 
+macro NULL 0 end
+
 /// Syscalls
 // Stolen from https://filippo.io/linux-syscall-table/
 // Not all of the syscalls here are useful/implemented. I literally just copy-pasted them.
@@ -322,10 +324,24 @@ macro SYS_process_vm_writev 311 end
 macro SYS_kcmp 312 end
 macro SYS_finit_module 313 end
 
+macro AT_FDCWD -100 end
+
+macro O_RDONLY 0 end
+
+macro CLOCK_MONOTONIC 1 end
+macro TIMER_ABSTIME 1 end
+
 // Wrappers for common syscalls
 macro write SYS_write syscall3 end
 macro read SYS_read syscall3 end
+macro openat SYS_openat syscall3 end
+macro close SYS_close syscall1 end
 macro exit SYS_exit syscall1 drop end
+macro clock_nanosleep SYS_clock_nanosleep syscall4 end
+
+macro nth_argv
+  8 * argv + ,64 cast(ptr)
+end
 
 macro inc64
   dup ,64 1 + .64
@@ -337,4 +353,16 @@ macro strlen
       swap 1 + swap 1 +
   end
   drop
+end
+
+macro puts
+  stdout write drop
+end
+
+macro eputs
+  stderr write drop
+end
+
+macro newline
+  '\n' puts
 end

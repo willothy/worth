@@ -29,7 +29,8 @@ pub enum Value {
     Str(String),
     Char(u8),
     #[allow(dead_code)]
-    Ptr(String), // Label or variable name
+    Ptr(String),
+    Bool(bool), // Label or variable name
 }
 
 impl Display for Value {
@@ -39,6 +40,7 @@ impl Display for Value {
             Value::Str(value) => write!(f, "{}", snailquote::escape(value)),
             Value::Char(value) => write!(f, "{}", value),
             Value::Ptr(value) => write!(f, "{}", value),
+            Value::Bool(value) => write!(f, "{}", value),
         }
     }
 }
@@ -237,6 +239,7 @@ pub enum InstructionKind {
 impl std::fmt::Display for InstructionKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            InstructionKind::Push(Value::Bool(b)) => write!(f, "{}", b),
             InstructionKind::Push(Value::Int(i)) => write!(f, "{}", i),
             InstructionKind::Push(Value::Str(s)) => write!(f, "{}", snailquote::escape(s)),
             InstructionKind::Push(Value::Char(c)) => write!(f, "'{}'", c),

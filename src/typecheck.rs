@@ -179,6 +179,9 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                 Value::Ptr(_) => {
                     tc!(push: Ptr);
                 }
+                Value::Bool(_) => {
+                    tc!(push: Bool);
+                }
             },
             InstructionKind::Op(op) => match op {
                 Op::Add => {

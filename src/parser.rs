@@ -14,9 +14,9 @@ use nom::{
     branch::alt,
     bytes::complete::tag,
     character::complete::{char, digit1, hex_digit1, multispace0, multispace1, satisfy},
-    combinator::eof,
+    combinator::{eof, opt},
     multi::{many0, many1},
-    sequence::{delimited, preceded},
+    sequence::{delimited, preceded, tuple},
     IResult,
 };
 use nom_locate::LocatedSpan;
@@ -98,8 +98,8 @@ pub fn parse_program<'a>(input: Span<'a>) -> Result<Vec<Token>> {
             parse_keyword,
             parse_syscalls,
             parse_intrinsic,
-            parse_op,
             parse_value,
+            parse_op,
             parse_name,
         )),
         alt((multispace1, eof)),
@@ -163,7 +163,7 @@ pub fn parse_bool<'a>(input: Span<'a>) -> IResult<Span<'a>, Token> {
             input.location_line() as usize,
             input.get_column(),
         ),
-        ty: TokenType::Value(Value::Int(value as i64)),
+        ty: TokenType::Value(Value::Bool(value)),
     };
     Ok((input, token))
 }
@@ -237,16 +237,20 @@ pub fn special_char<'a>(input: Span<'a>) -> IResult<Span<'a>, char> {
 }
 
 pub fn parse_int<'a>(input: Span<'a>) -> IResult<Span<'a>, Token> {
-    let (input, value) = digit1(input)?;
+    let (input, (negative, value)) = tuple((opt(char('-')), digit1))(input)?;
 
+    let mut fragment = value.fragment().to_string();
+    if negative.is_some() {
+        fragment.insert(0, '-');
+    }
     let token = Token {
-        value: value.fragment().to_string(),
+        value: fragment.clone(),
         location: (
             input.extra.to_string(),
             input.location_line() as usize,
             input.get_column(),
         ),
-        ty: TokenType::Value(Value::Int(value.fragment().parse::<i64>().unwrap())),
+        ty: TokenType::Value(Value::Int(fragment.parse::<i64>().unwrap())),
     };
     Ok((input, token))
 }

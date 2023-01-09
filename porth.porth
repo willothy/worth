@@ -1,13 +1,25 @@
 include "std.porth"
 
-macro OP_PUSH_INT 0 end
-macro OP_PLUS     1 end
-macro OP_PRINT    2 end
+
 
 macro ops-count mem end
 macro ops ops-count 8 + end
 
 macro push-op
-    
-
+    2drop
+    "[" puts here puts "] TODO: push-op is not implemented yet\n" puts 1 exit
 end
+
+macro simulate-ops
+    "[" puts here puts "] TODO: simulate-ops is not implemented yet\n" puts 1 exit
+end
+
+macro compile-ops
+    "[" puts here puts "] TODO: compile-ops is not implemented yet\n" puts 1 exit
+end
+
+compile-ops
+
+macro OP_PUSH_INT 0 end
+macro OP_PLUS     1 end
+macro OP_PRINT    2 end
