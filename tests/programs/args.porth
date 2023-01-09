@@ -5,7 +5,7 @@ include "../../std.porth"
 
 argv argc
 while dup 0 > do
-    over ,64 dup strlen swap
+    over ,64 cast(ptr) dup strlen swap
     stdout write drop
     "\n" stdout write drop
     1 - swap 8 + swap

@@ -65,6 +65,10 @@ impl From<RunOptions> for CompilerOptions {
 pub struct SimulatorOptions {
     #[clap(short = 'd', long)]
     pub debug: bool,
+    #[clap(long = "tc-debugger")]
+    pub tc_debug: bool,
+    #[clap(short = 's', long)]
+    pub step: bool,
     #[clap(
         long_help = "Arguments to pass to the program, use -- to separate them from the compiler arguments.\nExample: ./worthc test.porth run -d -- arg1 arg2."
     )]

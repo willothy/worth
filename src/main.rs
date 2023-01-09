@@ -46,7 +46,12 @@ fn main() -> Result<()> {
     let program =
         load_program(&args.file).with_context(|| format!("Failed to load {:?}.", args.file))?;
 
-    typecheck::typecheck(&program)?;
+    let tc_debugger = if let Commands::Simulate(opt) = &args.command {
+        opt.tc_debug
+    } else {
+        false
+    };
+    typecheck::typecheck(&program, tc_debugger)?;
 
     match args.command {
         Commands::Build(opt) => {

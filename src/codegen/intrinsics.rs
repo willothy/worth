@@ -15,7 +15,8 @@ intrinsics!(
     Drop2 = "2drop",
     Over,
     Argc,
-    Argv
+    Argv,
+    CastPtr = "cast(ptr)"
 );
 
 impl Display for Intrinsic {
@@ -23,6 +24,10 @@ impl Display for Intrinsic {
         let intrinsic: &str = self.into();
         write!(f, "{}", intrinsic)
     }
+}
+
+pub fn castptr(asm: &mut Builder) {
+    comment!(asm, "-- Pointer cast --");
 }
 
 pub fn argv(asm: &mut Builder) {

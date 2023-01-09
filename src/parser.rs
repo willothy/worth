@@ -265,9 +265,9 @@ pub fn parse_hex_int<'a>(input: Span<'a>) -> IResult<Span<'a>, Token> {
 }
 
 pub fn parse_intrinsic<'a>(input: Span<'a>) -> IResult<Span<'a>, Token> {
-    let (input, instruction) = alphanumeric1(input)?;
-
-    let intrinsic = match crate::codegen::intrinsics::Intrinsic::from_str(instruction.fragment()) {
+    let (input, instruction) = many1(satisfy(|c: char| !c.is_whitespace()))(input)?;
+    let fragment: String = instruction.iter().collect();
+    let intrinsic = match crate::codegen::intrinsics::Intrinsic::from_str(&fragment) {
         Ok(i) => i,
         Err(_) => {
             return Err(nom::Err::Error(nom::error::Error::new(
@@ -277,7 +277,7 @@ pub fn parse_intrinsic<'a>(input: Span<'a>) -> IResult<Span<'a>, Token> {
         }
     };
     let token = Token {
-        value: instruction.fragment().to_string(),
+        value: fragment,
         location: (
             input.extra.to_string(),
             input.location_line() as usize,

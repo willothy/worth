@@ -60,7 +60,7 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<()> {
     );
 
     // Allocate strings and push arguments (char** argv) onto the stack
-    for arg in argv.iter().rev() {
+    for arg in argv.iter() {
         let mut arg_bytes = arg.as_bytes().to_vec();
         arg_bytes.push(0); // null-terminate
         let len = arg_bytes.len();
@@ -267,6 +267,11 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<()> {
                 let a = pop!();
                 if a == 0 {
                     ip = *end_ip + 1;
+                    if opt.step {
+                        println!("{}: {:?}", ip, inst);
+                        println!("Stack: {:?}", stack);
+                        std::io::stdin().read_line(&mut String::new()).unwrap();
+                    }
                     continue;
                 }
             }
@@ -274,16 +279,31 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<()> {
                 let a = pop!();
                 if a == 0 {
                     ip = *else_ip + 1;
+                    if opt.step {
+                        println!("{}: {:?}", ip, inst);
+                        println!("Stack: {:?}", stack);
+                        std::io::stdin().read_line(&mut String::new()).unwrap();
+                    }
                     continue;
                 }
             }
             Instruction::Keyword(Keyword::Else { end_ip, .. }) => {
                 ip = *end_ip;
+                if opt.step {
+                    println!("{}: {:?}", ip, inst);
+                    println!("Stack: {:?}", stack);
+                    std::io::stdin().read_line(&mut String::new()).unwrap();
+                }
                 continue;
             }
             Instruction::Keyword(Keyword::End { while_ip, .. }) => {
                 if let Some(while_ip) = while_ip {
                     ip = *while_ip;
+                    if opt.step {
+                        println!("{}: {:?}", ip, inst);
+                        println!("Stack: {:?}", stack);
+                        std::io::stdin().read_line(&mut String::new()).unwrap();
+                    }
                     continue;
                 }
             }
@@ -334,6 +354,7 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<()> {
                 Intrinsic::Argv => {
                     stack.push(argv_buf_ptr as i64);
                 }
+                Intrinsic::CastPtr => {}
                 #[allow(unreachable_patterns)]
                 intrinsic => todo!("Implement intrinsic {}", intrinsic),
             },
@@ -494,6 +515,11 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<()> {
 
             #[allow(unreachable_patterns)]
             instruction => todo!("Implement instruction {:?}", instruction),
+        }
+        if opt.step {
+            println!("{}: {:?}", ip, inst);
+            println!("Stack: {:?}", stack);
+            std::io::stdin().read_line(&mut String::new()).unwrap();
         }
         ip += 1;
     }

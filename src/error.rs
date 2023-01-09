@@ -48,6 +48,8 @@ pub enum TypecheckError {
     InvalidEnd,
     #[error("Invalid else encountered")]
     InvalidElse,
+    #[error("Invalid loop encountered")]
+    InvalidLoop,
 }
 
 #[derive(Error, Debug)]

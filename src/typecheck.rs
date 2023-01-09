@@ -27,7 +27,7 @@ impl Display for ValType {
     }
 }
 
-pub fn typecheck(program: &Program) -> Result<()> {
+pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
     use ValType::*;
     let Program {
         instructions: program,
@@ -404,12 +404,6 @@ pub fn typecheck(program: &Program) -> Result<()> {
                 }
                 Op::Gte => {
                     let (a, b) = tc!(expect: (Int, Ptr, Char), (Int, Ptr, Char));
-                    if a == b && matches!(a, Int | Ptr | Char) {
-                        stack.push(Bool);
-                    } else {
-                        return Err(TypecheckError(InvalidTypeForOp(inst.to_string())))
-                            .with_context(|| format!("Invalid arg types for op {}: Expected matching types, found {} and {}", inst, a, b));
-                    }
                     match (a, b) {
                         (Int, Int) => stack.push(Bool),
                         (Ptr, Ptr) => stack.push(Bool),
@@ -428,17 +422,17 @@ pub fn typecheck(program: &Program) -> Result<()> {
                     }
                 }
                 Op::Store => {
-                    tc!(expect: (Ptr, Int, Char, Bool), (Ptr, Int));
+                    tc!(expect: (Ptr, Int, Char, Bool), Ptr);
                 }
                 Op::Store64 => {
-                    tc!(expect: (Ptr, Int, Char, Bool), (Ptr, Int));
+                    tc!(expect: (Ptr, Int, Char, Bool), Ptr);
                 }
                 Op::Load => {
-                    tc!(expect: (Ptr, Int));
+                    tc!(expect: Ptr);
                     stack.push(Int);
                 }
                 Op::Load64 => {
-                    tc!(expect: (Ptr, Int));
+                    tc!(expect: Ptr);
                     stack.push(Int);
                 }
                 Op::Mod => todo!(),
@@ -479,12 +473,41 @@ pub fn typecheck(program: &Program) -> Result<()> {
                     stack.push(a);
                     stack.push(b);
                 }
+                Intrinsic::CastPtr => {
+                    tc!(expect: Int => push: Ptr);
+                }
             },
             Instruction::Keyword(kw) => match kw {
-                Keyword::While { .. } => {}
+                Keyword::While { .. } => {
+                    snapshots.push((
+                        stack.clone(),
+                        Keyword::While {
+                            self_ip: 0,
+                            do_ip: 0,
+                        },
+                    ));
+                }
                 Keyword::Do { end_ip } => {
                     tc!(expect: Bool);
-                    snapshots.push((stack.clone(), Keyword::Do { end_ip: *end_ip }));
+                    let (stack_snapshot, op_type) = snapshots
+                        .pop()
+                        .ok_or(TypecheckError(InvalidLoop))
+                        .with_context(|| format!("Invalid do: No stack snapshot available"))?;
+                    if let Keyword::While { .. } = op_type {
+                        if stack != stack_snapshot {
+                            return Err(TypecheckError(InvalidLoop)).with_context(|| {
+                                format!(
+                                    "Expected types {:?}, got {:?}. A while loop cannot modify the stack.",
+                                    stack_snapshot, stack
+                                )
+                            });
+                        }
+                        snapshots.push((stack.clone(), Keyword::Do { end_ip: 0 }));
+                    } else {
+                        return Err(TypecheckError(InvalidLoop)).with_context(|| {
+                            format!("Invalid do: Expected while, got {:?}", op_type)
+                        });
+                    }
                 }
                 Keyword::If { else_ip } => {
                     tc!(expect: (Bool, Int, Ptr, Char));
@@ -570,17 +593,24 @@ pub fn typecheck(program: &Program) -> Result<()> {
             }
             unim => todo!("Implement typechecking for instruction {}", unim),
         };
+        if debugger {
+            println!("{}: {:?}", ip, inst);
+            println!("Stack: {:?}", stack);
+            println!("Snapshots: {}\n", snapshots.len());
+            std::io::stdin().read_line(&mut String::new()).unwrap();
+        }
+
         ip += 1;
     }
 
-    if stack.len() > 2 {
+    if stack.len() > 1 {
         return Err(TypecheckError(InvalidStack)).with_context(|| {
             format!(
                 "Invalid stack at end of program: Expected argc and/or return code, stack size was {}.",
                 stack.len()
             )
         });
-    } else if stack.len() == 2 && !matches!(&stack[1], ValType::Int) {
+    } else if stack.len() == 1 && !matches!(&stack[0], ValType::Int) {
         return Err(TypecheckError(InvalidStack)).with_context(|| {
             format!(
                 "Invalid stack at end of program: Expected argc and/or return code as int, got {}.",
