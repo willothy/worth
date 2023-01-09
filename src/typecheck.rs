@@ -553,6 +553,8 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                             });
                         }
                         snapshots.push((stack.clone(), Keyword::Do { end_ip: 0 }));
+                    } else if let Keyword::If { .. } = op_type {
+                        snapshots.push((stack.clone(), Keyword::Do { end_ip: 0 }));
                     } else {
                         return Err(TypecheckError(InvalidLoop)).with_context(|| {
                             format!(
@@ -565,7 +567,7 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                     }
                 }
                 Keyword::If { else_ip } => {
-                    tc!(expect: (Bool, Int, Ptr, Char));
+                    //tc!(expect: (Bool, Int, Ptr, Char));
                     snapshots.push((stack.clone(), Keyword::If { else_ip: *else_ip }));
                 }
                 Keyword::Else { .. } => {
@@ -579,11 +581,11 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                                 tok_loc(&inst.loc)
                             )
                         })?;
-                    if let Keyword::If { .. } = op_type {
+                    if let Keyword::Do { .. } = op_type {
                         snapshots.push((
                             std::mem::replace(&mut stack, stack_snapshot),
                             Keyword::Else {
-                                else_ip: 0,
+                                self_ip: 0,
                                 end_ip: 0,
                             },
                         ));
@@ -612,7 +614,7 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                                 )
                             });
                         }
-                    } else if let Keyword::If { .. } = op_type {
+                    } else if let Keyword::Do { .. } = op_type {
                         if stack != expected_stack {
                             return Err(TypecheckError(InvalidEnd)).with_context(|| {
                                 format!(

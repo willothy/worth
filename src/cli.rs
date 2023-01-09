@@ -8,17 +8,25 @@ pub struct Cli {
     #[clap(short, long = "unsafe", help = "Disables typechecking")]
     pub unsafe_: bool,
     #[clap(subcommand)]
-    pub command: Commands,
+    pub command: Option<Command>,
 }
 
 #[derive(Debug, Parser)]
-pub enum Commands {
+pub enum Command {
     #[clap(alias = "B", alias = "b")]
     Build(CompilerOptions),
     #[clap(alias = "R", alias = "r")]
     Run(RunOptions),
     #[clap(alias = "S", alias = "s")]
     Simulate(SimulatorOptions),
+    #[clap(alias = "G", alias = "g")]
+    Cfg(CfgOptions),
+}
+
+#[derive(Debug, Parser, Clone)]
+pub struct CfgOptions {
+    #[clap(short, long)]
+    pub output: Option<PathBuf>,
 }
 
 #[derive(Debug, Parser, Clone)]

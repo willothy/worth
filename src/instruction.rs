@@ -144,7 +144,7 @@ pub enum Keyword {
         else_ip: usize,
     },
     Else {
-        else_ip: usize,
+        self_ip: usize,
         end_ip: usize,
     },
     End {
@@ -165,7 +165,7 @@ impl Keyword {
             "do" => Ok(Keyword::Do { end_ip: 0 }),
             "if" => Ok(Keyword::If { else_ip: 0 }),
             "else" => Ok(Keyword::Else {
-                else_ip: 0,
+                self_ip: 0,
                 end_ip: 0,
             }),
             "end" => Ok(Keyword::End {

@@ -14,6 +14,7 @@ path = "src/main.rs"
 anyhow = "1.0.68"
 casey = "0.3.3"
 clap = { version = "4.0.32", features = ["derive"] }
+dialoguer = "0.10.2"
 nom = "7.1.2"
 nom_locate = "4.0.0"
 snailquote = "0.3.1"

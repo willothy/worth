@@ -2,9 +2,10 @@ use std::path::PathBuf;
 
 use clap::Parser;
 
-use cli::{Cli, Commands};
+use cli::{Cli, Command};
 use instruction::Program;
 
+mod cfg;
 mod cli;
 mod codegen;
 mod error;
@@ -46,7 +47,7 @@ fn main() -> Result<()> {
     let program =
         load_program(&args.file).with_context(|| format!("Failed to load {:?}.", args.file))?;
 
-    let tc_debugger = if let Commands::Simulate(opt) = &args.command {
+    let tc_debugger = if let Some(Command::Simulate(opt)) = &args.command {
         opt.tc_debug
     } else {
         false
@@ -56,17 +57,23 @@ fn main() -> Result<()> {
     }
 
     match args.command {
-        Commands::Build(opt) => {
+        Some(Command::Build(opt)) => {
             let compiled = codegen::compile(&program, opt)?;
             log::log(log::LogLevel::Info, format!("Built {:?}", compiled), false);
         }
-        Commands::Run(opt) => {
+        Some(Command::Run(opt)) => {
             let compiled = codegen::compile(&program, opt.clone().into())?
                 .canonicalize()
                 .with_context(|| format!("Could not find compiled file for {:?}", &program.name))?;
             runner::run(&compiled, opt)?;
         }
-        Commands::Simulate(opt) => sim::simulate(&program, opt)?,
+        Some(Command::Simulate(opt)) => sim::simulate(&program, opt)?,
+        Some(Command::Cfg(opt)) => {
+            cfg::dump(&program, opt)?;
+        }
+        None => {
+            todo!("Implement repl")
+        }
     };
 
     Ok(())

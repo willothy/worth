@@ -7,13 +7,13 @@ macro name mem end
 
 NAME_CAPACITY name stdin read
 
-dup 0 <= if
+if dup 0 <= do
   "ERROR: could not read your name, sorry ( ._.)\n" stderr write drop
   1 exit
 end
 
 
-dup 1 - name + , '\n' = if
+if dup 1 - name + , '\n' = do
   1 -
 end
 

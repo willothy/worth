@@ -1,11 +1,11 @@
 include "../../std.porth"
 
-'a' 97 != if
+if 'a' 97 != do
     "Char 'a' should equal 97\n" stdout write drop
     1 exit
 end
 
-'b' 98 != if
+if 'b' 98 != do
     "Char 'b' should equal 98\n" stdout write drop
     1 exit
 end

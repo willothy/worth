@@ -216,7 +216,8 @@ fn collect_macros(program: &mut Program) -> Result<()> {
                 macro_stack.push(("while", ip));
             }
             InstructionKind::Keyword(Keyword::Do { .. }) => {
-                assert!(macro_stack.pop().unwrap().0 == "while");
+                let t = macro_stack.pop().unwrap().0;
+                assert!(t == "while" || t == "if");
                 macro_stack.push(("do", ip));
             }
             _ => {}
@@ -231,34 +232,6 @@ fn collect_macros(program: &mut Program) -> Result<()> {
 fn expand_macros(program: &mut Program) -> Result<bool> {
     let mut macro_stack = Vec::new();
     let mut has_expanded = false;
-    // Expand macros in macros
-    /* let mut expanded_macros = HashMap::new();
-    for (_, macro_) in &program.macros {
-        let mut new_body = Vec::new();
-        macro_stack.clear();
-        for inst in &macro_.body {
-            match inst {
-                Instruction::Name(name) => {
-                    if let Some(macro_) = program.macros.get(name) {
-                        new_body.extend(macro_.body.clone());
-                        continue;
-                    }
-                }
-                _ => {}
-            }
-            new_body.push(inst.clone());
-        }
-        expanded_macros.insert(
-            macro_.name.clone(),
-            Macro {
-                name: macro_.name.clone(),
-                body: new_body,
-                loc: macro_.loc,
-                uses: vec![],
-            },
-        );
-    }
-    program.macros = expanded_macros; */
 
     // Expand macros
     let mut new_instructions = Vec::new();
@@ -284,7 +257,8 @@ fn expand_macros(program: &mut Program) -> Result<bool> {
                 macro_stack.push(("while", 0));
             }
             InstructionKind::Keyword(Keyword::Do { .. }) => {
-                assert!(macro_stack.pop().unwrap().0 == "while");
+                let t = macro_stack.pop().unwrap().0;
+                assert!(t == "while" || t == "if");
                 macro_stack.push(("do", 0));
             }
             InstructionKind::Keyword(Keyword::If { .. }) => {
@@ -292,9 +266,9 @@ fn expand_macros(program: &mut Program) -> Result<bool> {
             }
             InstructionKind::Keyword(Keyword::Else { .. }) => {
                 let pred = macro_stack.pop().unwrap().0;
-                if pred != "if" {
+                if pred != "do" {
                     return Err(PreprocessorError(UnexpectedKeyword))
-                        .with_context(|| format!("Else without if: found {}", pred));
+                        .with_context(|| format!("Else without if/do: found {}", pred));
                 }
                 macro_stack.push(("else", 0));
             }
@@ -335,50 +309,51 @@ fn expand_macros(program: &mut Program) -> Result<bool> {
 }
 
 fn jumps(program: &mut Program) -> Result<()> {
-    let mut jump_stack = Vec::new();
+    let mut jump_stack: Vec<(&str, Option<&mut usize>, Option<&mut usize>)> = Vec::new();
     for (ip, instruction) in program.instructions.iter_mut().enumerate() {
         match &mut instruction.kind {
             InstructionKind::Keyword(Keyword::If { else_ip }) => {
-                jump_stack.push(("if", 0, else_ip));
+                jump_stack.push(("if", Some(else_ip), None));
             }
-            InstructionKind::Keyword(Keyword::Else { else_ip, end_ip }) => {
-                let (kind, _, precursor_else_ip) = jump_stack.pop().unwrap();
-                if kind != "if" {
-                    return Err(PreprocessorError(UnexpectedKeyword))
-                        .with_context(|| format!("Else without if: found {} instead", kind));
-                }
-                *precursor_else_ip = ip;
-                *else_ip = ip;
-                jump_stack.push(("else", 0, end_ip));
+            InstructionKind::Keyword(Keyword::Else { self_ip, end_ip }) => {
+                let (t, if_do_end_ip, _) = jump_stack.pop().unwrap();
+                *self_ip = ip;
+                assert!(t == "do");
+                *if_do_end_ip.unwrap() = *self_ip;
+                jump_stack.push(("else", Some(end_ip), None));
             }
             InstructionKind::Keyword(Keyword::End {
                 self_ip,
-                while_ip: end_ip,
+                while_ip: return_ip,
             }) => {
-                let (kind, while_ip, precursor_end_ip) = jump_stack.pop().unwrap();
-                if kind != "if" && kind != "else" && kind != "do" {
-                    return Err(PreprocessorError(UnexpectedKeyword)).with_context(|| {
-                        format!("End without if/else/do: found {} instead", kind)
-                    });
-                }
-                *precursor_end_ip = ip;
+                let (t, end_ip, while_ip) = jump_stack.pop().unwrap();
                 *self_ip = ip;
-                if kind == "do" {
-                    *end_ip = Some(while_ip);
+                match t {
+                    "else" => {
+                        *end_ip.unwrap() = *self_ip;
+                    }
+                    "do" => {
+                        *return_ip = while_ip.cloned();
+                        *end_ip.unwrap() = *self_ip;
+                    }
+                    _ => panic!(),
                 }
             }
-            InstructionKind::Keyword(Keyword::While { self_ip, do_ip }) => {
+            InstructionKind::Keyword(Keyword::While { self_ip, do_ip: _ }) => {
                 *self_ip = ip;
-                jump_stack.push(("while", ip, do_ip));
+                jump_stack.push(("while", Some(self_ip), None));
             }
             InstructionKind::Keyword(Keyword::Do { end_ip }) => {
-                let (kind, while_ip, precursor_do_ip) = jump_stack.pop().unwrap();
-                if kind != "while" {
-                    return Err(PreprocessorError(UnexpectedKeyword))
-                        .with_context(|| format!("Do without while: found {} instead", kind));
+                let (t, while_ip, _) = jump_stack.pop().unwrap();
+                match t {
+                    "if" => {
+                        jump_stack.push(("do", Some(end_ip), None));
+                    }
+                    "while" => {
+                        jump_stack.push(("do", Some(end_ip), while_ip));
+                    }
+                    _ => panic!(),
                 }
-                *precursor_do_ip = ip;
-                jump_stack.push(("do", while_ip, end_ip));
             }
             _ => {}
         }

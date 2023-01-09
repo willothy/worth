@@ -98,17 +98,13 @@ pub fn compile(program: &Program, opt: CompilerOptions) -> Result<PathBuf> {
                 );
                 comment!(asm, "-- do --");
             }
-            InstructionKind::Keyword(Keyword::If { else_ip }) => {
+            InstructionKind::Keyword(Keyword::If { .. }) => {
                 comment!(asm, "-- if --");
-                asm!(
-                    asm,
-                    ("pop", "rax"),
-                    ("test", "rax, rax"),
-                    /// Jump to else statement
-                    ("jz", "addr_{}", else_ip)
-                );
             }
-            InstructionKind::Keyword(Keyword::Else { else_ip, end_ip }) => {
+            InstructionKind::Keyword(Keyword::Else {
+                self_ip: else_ip,
+                end_ip,
+            }) => {
                 comment!(asm, "-- else --");
                 asm!(
                     asm,

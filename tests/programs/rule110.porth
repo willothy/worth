@@ -4,7 +4,7 @@ mem 28 + 1 .
 
 0 while dup 28 < do
    0 while dup 30 < do
-      dup mem + , if
+      if dup mem + , 1 = do
          mem 30 + '*' .
       else
          mem 30 + ' ' .
