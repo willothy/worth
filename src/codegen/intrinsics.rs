@@ -13,7 +13,9 @@ intrinsics!(
     Mem,
     Drop,
     Drop2 = "2drop",
-    Over
+    Over,
+    Argc,
+    Argv
 );
 
 impl Display for Intrinsic {
@@ -21,6 +23,24 @@ impl Display for Intrinsic {
         let intrinsic: &str = self.into();
         write!(f, "{}", intrinsic)
     }
+}
+
+pub fn argv(asm: &mut Builder) {
+    asm!(
+        asm,
+        ("mov", "rax, [args_ptr]"),
+        ("add", "rax, 8"),
+        ("push", "rax")
+    );
+}
+
+pub fn argc(asm: &mut Builder) {
+    asm!(
+        asm,
+        ("mov", "rax, [args_ptr]"),
+        ("mov rax, [rax]"),
+        ("push", "rax")
+    );
 }
 
 pub fn panic(asm: &mut Builder) {

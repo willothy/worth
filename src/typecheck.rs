@@ -13,7 +13,6 @@ pub enum ValType {
     Ptr,
     Str,
     Bool,
-    LoopStop,
 }
 
 impl Display for ValType {
@@ -24,18 +23,18 @@ impl Display for ValType {
             ValType::Ptr => write!(f, "ptr"),
             ValType::Str => write!(f, "str"),
             ValType::Bool => write!(f, "bool"),
-            ValType::LoopStop => write!(f, "loopstop"),
         }
     }
 }
 
 pub fn typecheck(program: &Program) -> Result<()> {
+    use ValType::*;
     let Program {
         instructions: program,
         ..
     } = program;
 
-    let mut stack = Vec::new();
+    let mut stack = vec![]; // Start with int for argc and a ptr for argv
     let mut snapshots = Vec::new();
 
     let mut ip = 0;
@@ -134,7 +133,6 @@ pub fn typecheck(program: &Program) -> Result<()> {
             }};
         }
 
-        use ValType::*;
         match inst {
             Instruction::Push(val) => match val {
                 Value::Int(_) => {
@@ -152,11 +150,15 @@ pub fn typecheck(program: &Program) -> Result<()> {
             },
             Instruction::Op(op) => match op {
                 Op::Add => {
-                    let (a, b) = tc!(expect: (Int, Ptr), Int);
+                    let (a, b) = tc!(expect: (Int, Ptr, Char, Bool), (Int, Ptr, Char, Bool));
                     match (a, b) {
                         (Int, Int) => stack.push(Int),
                         (Int, Ptr) => stack.push(Ptr),
                         (Ptr, Int) => stack.push(Ptr),
+                        (Char, Int) => stack.push(Char),
+                        (Int, Char) => stack.push(Int),
+                        (Int, Bool) => stack.push(Int),
+                        (Bool, Int) => stack.push(Int),
                         (illegal_a, illegal_b) => {
                             return Err(TypecheckError(InvalidTypeForOp(inst.to_string())))
                                 .with_context(|| {
@@ -169,7 +171,25 @@ pub fn typecheck(program: &Program) -> Result<()> {
                     }
                 }
                 Op::Sub => {
-                    tc!(expect: (Int, Ptr), (Int, Ptr) => push: Int);
+                    let (a, b) = tc!(expect: (Int, Ptr, Char, Bool), (Int, Ptr, Char, Bool));
+                    match (a, b) {
+                        (Int, Int) => stack.push(Int),
+                        (Int, Ptr) => stack.push(Ptr),
+                        (Ptr, Int) => stack.push(Ptr),
+                        (Char, Int) => stack.push(Char),
+                        (Int, Char) => stack.push(Int),
+                        (Int, Bool) => stack.push(Int),
+                        (Bool, Int) => stack.push(Int),
+                        (illegal_a, illegal_b) => {
+                            return Err(TypecheckError(InvalidTypeForOp(inst.to_string())))
+                                .with_context(|| {
+                                    format!(
+                                        "Invalid type for {}: Expected int or ptr, got {} and {}.",
+                                        inst, illegal_a, illegal_b
+                                    )
+                                });
+                        }
+                    }
                 }
                 Op::Mul => {
                     tc!(expect: Int, Int => push: Int);
@@ -180,41 +200,252 @@ pub fn typecheck(program: &Program) -> Result<()> {
                 Op::DivMod => {
                     tc!(expect: Int, Int =>  push: Int, Int);
                 }
-                Op::BitwiseAnd => todo!(),
-                Op::BitwiseOr => todo!(),
-                Op::BitwiseXor => todo!(),
-                Op::BitwiseNot => todo!(),
-                Op::Shl => todo!(),
-                Op::Shr => todo!(),
-                Op::Eq => todo!(),
-                Op::Neq => todo!(),
+                Op::BitwiseAnd => {
+                    let (a, b) = tc!(expect: (Int, Char, Bool), (Int, Char, Bool));
+                    match (a, b) {
+                        (Int, Bool) => stack.push(Int),
+                        (Bool, Int) => stack.push(Int),
+                        (Bool, Bool) => stack.push(Bool),
+                        (Int, Char) => stack.push(Int),
+                        (Char, Int) => stack.push(Int),
+                        (Char, Char) => stack.push(Char),
+                        (Char, Bool) => stack.push(Char),
+                        (Bool, Char) => stack.push(Char),
+                        (Int, Int) => stack.push(Int),
+                        (illegal_a, illegal_b) => {
+                            return Err(TypecheckError(InvalidTypeForOp(inst.to_string())))
+                                .with_context(|| {
+                                    format!(
+                                        "Invalid type for {}: Expected int or bool, got {} and {}.",
+                                        inst, illegal_a, illegal_b
+                                    )
+                                });
+                        }
+                    }
+                }
+                Op::BitwiseOr => {
+                    let (a, b) = tc!(expect: (Int, Char, Bool), (Int, Char, Bool));
+                    match (a, b) {
+                        (Int, Bool) => stack.push(Int),
+                        (Bool, Int) => stack.push(Int),
+                        (Bool, Bool) => stack.push(Bool),
+                        (Int, Char) => stack.push(Int),
+                        (Char, Int) => stack.push(Int),
+                        (Char, Char) => stack.push(Char),
+                        (Char, Bool) => stack.push(Char),
+                        (Bool, Char) => stack.push(Char),
+                        (Int, Int) => stack.push(Int),
+                        (illegal_a, illegal_b) => {
+                            return Err(TypecheckError(InvalidTypeForOp(inst.to_string())))
+                                .with_context(|| {
+                                    format!(
+                                        "Invalid type for {}: Expected int or bool, got {} and {}.",
+                                        inst, illegal_a, illegal_b
+                                    )
+                                });
+                        }
+                    }
+                }
+                Op::BitwiseXor => {
+                    let (a, b) = tc!(expect: (Int, Char, Bool), (Int, Char, Bool));
+                    match (a, b) {
+                        (Int, Bool) => stack.push(Int),
+                        (Bool, Int) => stack.push(Int),
+                        (Bool, Bool) => stack.push(Bool),
+                        (Int, Char) => stack.push(Int),
+                        (Char, Int) => stack.push(Int),
+                        (Char, Char) => stack.push(Char),
+                        (Char, Bool) => stack.push(Char),
+                        (Bool, Char) => stack.push(Char),
+                        (Int, Int) => stack.push(Int),
+                        (illegal_a, illegal_b) => {
+                            return Err(TypecheckError(InvalidTypeForOp(inst.to_string())))
+                                .with_context(|| {
+                                    format!(
+                                        "Invalid type for {}: Expected int or bool, got {} and {}.",
+                                        inst, illegal_a, illegal_b
+                                    )
+                                });
+                        }
+                    }
+                }
+                Op::BitwiseNot => {
+                    let t = tc!(expect: (Int, Bool));
+                    match t {
+                        Int => stack.push(Int),
+                        Char => stack.push(Ptr),
+                        Ptr => panic!(),
+                        Str => panic!(),
+                        Bool => stack.push(Bool),
+                    }
+                }
+                Op::Shl => {
+                    tc!(expect: Int, Int => push: Int);
+                }
+                Op::Shr => {
+                    tc!(expect: Int, Int => push: Int);
+                }
+                Op::Eq => {
+                    let (a, b) = tc!(
+                        expect: (Int, Ptr, Char, Bool, Str),
+                        (Int, Ptr, Char, Bool, Str)
+                    );
+                    match (a, b) {
+                        (Int, Int) => stack.push(Bool),
+                        (Int, Char) => stack.push(Bool),
+                        (Int, Ptr) => stack.push(Bool),
+                        (Int, Bool) => stack.push(Bool),
+                        (Char, Char) => stack.push(Bool),
+                        (Char, Int) => stack.push(Bool),
+                        (Char, Bool) => stack.push(Bool),
+                        (Ptr, Ptr) => stack.push(Bool),
+                        (Ptr, Int) => stack.push(Bool),
+                        (Str, Str) => stack.push(Bool),
+                        (Bool, Bool) => stack.push(Bool),
+                        (Bool, Int) => stack.push(Bool),
+                        (Bool, Char) => stack.push(Bool),
+                        (illegal_a, illegal_b) => {
+                            return Err(TypecheckError(InvalidTypeForOp(inst.to_string())))
+                                .with_context(|| {
+                                    format!(
+                                        "Invalid type for {}: Expected int or ptr, got {} and {}.",
+                                        inst, illegal_a, illegal_b
+                                    )
+                                });
+                        }
+                    }
+                }
+                Op::Neq => {
+                    let (a, b) = tc!(
+                        expect: (Int, Ptr, Char, Bool, Str),
+                        (Int, Ptr, Char, Bool, Str)
+                    );
+                    match (a, b) {
+                        (Int, Int) => stack.push(Bool),
+                        (Int, Char) => stack.push(Bool),
+                        (Int, Ptr) => stack.push(Bool),
+                        (Int, Bool) => stack.push(Bool),
+                        (Char, Char) => stack.push(Bool),
+                        (Char, Int) => stack.push(Bool),
+                        (Char, Bool) => stack.push(Bool),
+                        (Ptr, Ptr) => stack.push(Bool),
+                        (Ptr, Int) => stack.push(Bool),
+                        (Str, Str) => stack.push(Bool),
+                        (Bool, Bool) => stack.push(Bool),
+                        (Bool, Int) => stack.push(Bool),
+                        (Bool, Char) => stack.push(Bool),
+                        (illegal_a, illegal_b) => {
+                            return Err(TypecheckError(InvalidTypeForOp(inst.to_string())))
+                                .with_context(|| {
+                                    format!(
+                                        "Invalid type for {}: Expected int or ptr, got {} and {}.",
+                                        inst, illegal_a, illegal_b
+                                    )
+                                });
+                        }
+                    }
+                }
                 Op::Lt => {
-                    let (a, b) = tc!(expect: (Int, Ptr), (Int, Ptr));
-                    if a == b && matches!(a, Int | Ptr) {
-                        stack.push(Bool);
-                    } else {
-                        return Err(TypecheckError(InvalidTypeForOp(inst.to_string())))
-                            .with_context(|| format!("Invalid arg types for op {}: Expected matching types, found {} and {}", inst, a, b));
+                    let (a, b) = tc!(expect: (Int, Ptr, Char), (Int, Ptr, Char));
+                    match (a, b) {
+                        (Int, Int) => stack.push(Bool),
+                        (Ptr, Ptr) => stack.push(Bool),
+                        (Char, Char) => stack.push(Bool),
+                        (Char, Int) => stack.push(Bool),
+                        (Int, Char) => stack.push(Bool),
+                        (illegal_a, illegal_b) => {
+                            return Err(TypecheckError(InvalidTypeForOp(inst.to_string())))
+                                .with_context(|| {
+                                    format!(
+                                        "Invalid type for {}: Expected int or ptr, got {} and {}.",
+                                        inst, illegal_a, illegal_b
+                                    )
+                                });
+                        }
                     }
                 }
                 Op::Gt => {
-                    let (a, b) = tc!(expect: (Int, Ptr), (Int, Ptr));
-                    if a == b && matches!(a, Int | Ptr) {
+                    let (a, b) = tc!(expect: (Int, Ptr, Char), (Int, Ptr, Char));
+                    match (a, b) {
+                        (Int, Int) => stack.push(Bool),
+                        (Ptr, Ptr) => stack.push(Bool),
+                        (Char, Char) => stack.push(Bool),
+                        (Char, Int) => stack.push(Bool),
+                        (Int, Char) => stack.push(Bool),
+                        (illegal_a, illegal_b) => {
+                            return Err(TypecheckError(InvalidTypeForOp(inst.to_string())))
+                                .with_context(|| {
+                                    format!(
+                                        "Invalid type for {}: Expected int or ptr, got {} and {}.",
+                                        inst, illegal_a, illegal_b
+                                    )
+                                });
+                        }
+                    }
+                }
+                Op::Lte => {
+                    let (a, b) = tc!(expect: (Int, Ptr, Char), (Int, Ptr, Char));
+                    match (a, b) {
+                        (Int, Int) => stack.push(Bool),
+                        (Ptr, Ptr) => stack.push(Bool),
+                        (Char, Char) => stack.push(Bool),
+                        (Char, Int) => stack.push(Bool),
+                        (Int, Char) => stack.push(Bool),
+                        (illegal_a, illegal_b) => {
+                            return Err(TypecheckError(InvalidTypeForOp(inst.to_string())))
+                                .with_context(|| {
+                                    format!(
+                                        "Invalid type for {}: Expected int or ptr, got {} and {}.",
+                                        inst, illegal_a, illegal_b
+                                    )
+                                });
+                        }
+                    }
+                }
+                Op::Gte => {
+                    let (a, b) = tc!(expect: (Int, Ptr, Char), (Int, Ptr, Char));
+                    if a == b && matches!(a, Int | Ptr | Char) {
                         stack.push(Bool);
                     } else {
                         return Err(TypecheckError(InvalidTypeForOp(inst.to_string())))
                             .with_context(|| format!("Invalid arg types for op {}: Expected matching types, found {} and {}", inst, a, b));
                     }
+                    match (a, b) {
+                        (Int, Int) => stack.push(Bool),
+                        (Ptr, Ptr) => stack.push(Bool),
+                        (Char, Char) => stack.push(Bool),
+                        (Char, Int) => stack.push(Bool),
+                        (Int, Char) => stack.push(Bool),
+                        (illegal_a, illegal_b) => {
+                            return Err(TypecheckError(InvalidTypeForOp(inst.to_string())))
+                                .with_context(|| {
+                                    format!(
+                                        "Invalid type for {}: Expected int or ptr, got {} and {}.",
+                                        inst, illegal_a, illegal_b
+                                    )
+                                });
+                        }
+                    }
                 }
-                Op::Lte => todo!(),
-                Op::Gte => todo!(),
-                Op::Store => todo!(),
-                Op::Load => todo!(),
-                Op::Load64 => todo!(),
-                Op::Store64 => todo!(),
+                Op::Store => {
+                    tc!(expect: (Ptr, Int, Char, Bool), (Ptr, Int));
+                }
+                Op::Store64 => {
+                    tc!(expect: (Ptr, Int, Char, Bool), (Ptr, Int));
+                }
+                Op::Load => {
+                    tc!(expect: (Ptr, Int));
+                    stack.push(Int);
+                }
+                Op::Load64 => {
+                    tc!(expect: (Ptr, Int));
+                    stack.push(Int);
+                }
                 Op::Mod => todo!(),
             },
             Instruction::Intrinsic(i) => match i {
+                Intrinsic::Argc => tc!(push: Int),
+                Intrinsic::Argv => tc!(push: Ptr),
                 Intrinsic::Print => require!(1),
                 Intrinsic::Panic => require!(0),
                 Intrinsic::Dup => {
@@ -222,14 +453,23 @@ pub fn typecheck(program: &Program) -> Result<()> {
                     stack.push(a);
                     stack.push(a);
                 }
-                Intrinsic::Dup2 => todo!(),
+                Intrinsic::Dup2 => {
+                    let a = pop!();
+                    let b = pop!();
+                    stack.push(b);
+                    stack.push(a);
+                    stack.push(b);
+                    stack.push(a);
+                }
                 Intrinsic::Swap => {
                     let a = pop!();
                     let b = pop!();
                     stack.push(a);
                     stack.push(b);
                 }
-                Intrinsic::Mem => todo!(),
+                Intrinsic::Mem => {
+                    tc!(push: Ptr);
+                }
                 Intrinsic::Drop => require!(1),
                 Intrinsic::Drop2 => require!(2),
                 Intrinsic::Over => {
@@ -247,10 +487,28 @@ pub fn typecheck(program: &Program) -> Result<()> {
                     snapshots.push((stack.clone(), Keyword::Do { end_ip: *end_ip }));
                 }
                 Keyword::If { else_ip } => {
-                    tc!(expect: Bool);
+                    tc!(expect: (Bool, Int, Ptr, Char));
                     snapshots.push((stack.clone(), Keyword::If { else_ip: *else_ip }));
                 }
-                Keyword::Else { .. } => todo!(),
+                Keyword::Else { .. } => {
+                    let (stack_snapshot, op_type) = snapshots
+                        .pop()
+                        .ok_or(TypecheckError(InvalidElse))
+                        .with_context(|| format!("Invalid else: No stack snapshot available"))?;
+                    if let Keyword::If { .. } = op_type {
+                        snapshots.push((
+                            std::mem::replace(&mut stack, stack_snapshot),
+                            Keyword::Else {
+                                else_ip: 0,
+                                end_ip: 0,
+                            },
+                        ));
+                    } else {
+                        return Err(TypecheckError(InvalidElse)).with_context(|| {
+                            format!("Invalid else: Expected if, got {:?}", op_type)
+                        });
+                    }
+                }
                 Keyword::End { .. } => {
                     let (expected_stack, op_type) = snapshots
                         .pop()
@@ -260,7 +518,7 @@ pub fn typecheck(program: &Program) -> Result<()> {
                         if stack != expected_stack {
                             return Err(TypecheckError(InvalidEnd)).with_context(|| {
                                 format!(
-                                    "Invalid end: Expected types {:?}, got {:?}",
+                                    "Expected types {:?}, got {:?}. A while loop cannot modify the stack.",
                                     expected_stack, stack
                                 )
                             });
@@ -269,13 +527,20 @@ pub fn typecheck(program: &Program) -> Result<()> {
                         if stack != expected_stack {
                             return Err(TypecheckError(InvalidEnd)).with_context(|| {
                                 format!(
-                                    "Invalid end: Expected types {:?}, got {:?}",
+                                    "Expected types {:?}, got {:?}. An elseless if statement cannot modify the stack.",
                                     expected_stack, stack
                                 )
                             });
                         }
                     } else if let Keyword::Else { .. } = op_type {
-                        unimplemented!()
+                        if stack != expected_stack {
+                            return Err(TypecheckError(InvalidEnd)).with_context(|| {
+                                format!(
+                                    "Expected types {:?}, got {:?}. Both branches of an if statement must push the same types to the stack",
+                                    expected_stack, stack
+                                )
+                            });
+                        }
                     } else {
                         unreachable!()
                     }
@@ -308,17 +573,17 @@ pub fn typecheck(program: &Program) -> Result<()> {
         ip += 1;
     }
 
-    if stack.len() > 1 {
+    if stack.len() > 2 {
         return Err(TypecheckError(InvalidStack)).with_context(|| {
             format!(
-                "Invalid stack at end of program: Expected empty stack or return code, stack size was {}.",
+                "Invalid stack at end of program: Expected argc and/or return code, stack size was {}.",
                 stack.len()
             )
         });
-    } else if stack.len() == 1 && !matches!(&stack[0], ValType::Int) {
+    } else if stack.len() == 2 && !matches!(&stack[1], ValType::Int) {
         return Err(TypecheckError(InvalidStack)).with_context(|| {
             format!(
-                "Invalid stack at end of program: Expected empty stack or return code as int, got {}.",
+                "Invalid stack at end of program: Expected argc and/or return code as int, got {}.",
                 &stack[0]
             )
         });

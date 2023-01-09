@@ -10,20 +10,18 @@ macro memread
     mem + ,
 end
 
-0
 // add "abc" to memory
 97 0 memset
 98 1 memset
 99 2 memset
 10 4 memset
 13 5 memset
-
-3 mem 1 1 syscall3
+3 mem stdout write drop
 
 // Set "abc" to "bcd"
 0 memread 1 + 0 memset
 1 memread 1 + 1 memset
 2 memread 1 + 2 memset
+5 mem stdout write drop 
 
-5 mem stdout write drop
 

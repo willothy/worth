@@ -20,7 +20,8 @@ fn runner(category: &str, name: &str) {
     assert_eq!(
         output.status.success(),
         true,
-        "\n\n---- Compiler Error ----\nCompiler exited with non-zero status for program:\n\n{}\n-- End Compiler Error --\n\n",
+        "\n\n---- Compiler Error ----\nCompiler exited with non-zero status for program {}:\n\n{}\n-- End Compiler Error --\n\n",
+        &name,
         unsafe { String::from_utf8_unchecked(output.stderr) }
     );
     let mut output = Command::new(&out_file);

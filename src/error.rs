@@ -46,6 +46,8 @@ pub enum TypecheckError {
     MacroInCode,
     #[error("Invalid end encountered")]
     InvalidEnd,
+    #[error("Invalid else encountered")]
+    InvalidElse,
 }
 
 #[derive(Error, Debug)]
@@ -124,4 +126,6 @@ pub enum RuntimeError {
     MacroNotExpanded,
     #[error("Name not resolved")]
     NameNotResolved,
+    #[error("Buffer overflow")]
+    BufferOverflow,
 }

@@ -9,4 +9,4 @@ macro acc mem end
 
   swap over +
 end
-acc ,64 print
+acc ,64 print print print

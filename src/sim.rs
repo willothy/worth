@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::io::{self, BufRead, BufReader, Write};
 
 use crate::error::{Error::RuntimeError, RuntimeError::*};
@@ -24,48 +25,74 @@ impl BinaryIO {
     }
 }
 
-const STR_CAPACITY: usize = 4096;
+const STR_CAPACITY: usize = 640_000;
+const ARGV_CAPACITY: usize = 640_000;
 const BSS_CAPACITY: usize = 640_000;
+const NULL_PTR_PADDING: usize = 1;
+const MEM_LIMIT: usize = NULL_PTR_PADDING + STR_CAPACITY + ARGV_CAPACITY + BSS_CAPACITY;
 
 pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<()> {
+    let debug = opt.debug;
     let Program {
         instructions: program,
         name: program_name,
         base_path,
         ..
     } = program;
+
     let mut stack = Vec::new();
-    let mut bss: Vec<u8> = vec![0; STR_CAPACITY + BSS_CAPACITY + 1];
-    let mut str_allocated = 1;
-    let mut args = opt.sim_args;
-    args.insert(
+    let mut bss: Vec<u8> = vec![0; NULL_PTR_PADDING + STR_CAPACITY + ARGV_CAPACITY + BSS_CAPACITY];
+
+    let str_buf_ptr = NULL_PTR_PADDING;
+    let mut str_size = 0;
+
+    let argv_buf_ptr = NULL_PTR_PADDING + STR_CAPACITY;
+    let mut argc = 0;
+
+    let mem_buf_ptr = NULL_PTR_PADDING + STR_CAPACITY + ARGV_CAPACITY;
+
+    let mut fds: Vec<BinaryIO> = BinaryIO::stdio();
+
+    let mut argv = opt.sim_args;
+    argv.insert(
         0,
         base_path.join(program_name).to_str().unwrap().to_string(),
     );
 
     // Allocate strings and push arguments (char** argv) onto the stack
-    for arg in args.iter().rev() {
+    for arg in argv.iter().rev() {
         let mut arg_bytes = arg.as_bytes().to_vec();
         arg_bytes.push(0); // null-terminate
         let len = arg_bytes.len();
-        stack.push(str_allocated as i64);
-        bss[str_allocated..str_allocated + len].copy_from_slice(&arg_bytes);
-        str_allocated += len;
-        if str_allocated > STR_CAPACITY {
+        let arg_ptr = str_buf_ptr + str_size;
+        bss[arg_ptr..arg_ptr + len].copy_from_slice(&arg_bytes);
+        str_size += len;
+
+        if arg_ptr > STR_CAPACITY {
             return Err(RuntimeError(StringCapacityExceeded)).with_context(|| {
-                format!(
-                    "String capacity exceeded: {} > {}",
-                    str_allocated, STR_CAPACITY
-                )
+                format!("String capacity exceeded: {} > {}", arg_ptr, STR_CAPACITY)
+            });
+        }
+
+        let argv_ptr = argv_buf_ptr + (argc * 8);
+        // copy argv_ptr to bss[argv_ptr..argv_ptr + 8]
+        bss[argv_ptr] = (arg_ptr >> 56) as u8;
+        bss[argv_ptr + 1] = (arg_ptr >> 48) as u8;
+        bss[argv_ptr + 2] = (arg_ptr >> 40) as u8;
+        bss[argv_ptr + 3] = (arg_ptr >> 32) as u8;
+        bss[argv_ptr + 4] = (arg_ptr >> 24) as u8;
+        bss[argv_ptr + 5] = (arg_ptr >> 16) as u8;
+        bss[argv_ptr + 6] = (arg_ptr >> 8) as u8;
+        bss[argv_ptr + 7] = arg_ptr as u8;
+
+        argc += 1;
+
+        if argc * 8 > ARGV_CAPACITY {
+            return Err(RuntimeError(BufferOverflow)).with_context(|| {
+                format!("Argv buffer overflow: {} > {}", argc * 8, ARGV_CAPACITY)
             });
         }
     }
-
-    // Push argc onto the stack
-    stack.push(args.len() as i64);
-
-    let mut fds: Vec<BinaryIO> = BinaryIO::stdio();
-    let debug = opt.debug;
 
     let mut ip = 0;
     while ip < program.len() {
@@ -98,14 +125,15 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<()> {
                 Value::Str(s) => {
                     let len = s.as_bytes().len();
                     stack.push(len as i64);
-                    stack.push(str_allocated as i64);
-                    bss[str_allocated..str_allocated + len].copy_from_slice(s.as_bytes());
-                    str_allocated += len;
-                    if str_allocated > STR_CAPACITY {
+                    let str_buf_end = str_buf_ptr + str_size;
+                    stack.push(str_buf_end as i64);
+                    bss[str_buf_end..str_buf_end + len].copy_from_slice(s.as_bytes());
+                    str_size += len + 1;
+                    if str_buf_end > STR_CAPACITY {
                         return Err(RuntimeError(StringCapacityExceeded)).with_context(|| {
                             format!(
                                 "String capacity exceeded: {} > {}",
-                                str_allocated, STR_CAPACITY
+                                str_buf_end, STR_CAPACITY
                             )
                         });
                     }
@@ -271,7 +299,7 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<()> {
                     stack.push(a);
                     stack.push(a);
                 }
-                Intrinsic::Mem => stack.push(STR_CAPACITY as i64),
+                Intrinsic::Mem => stack.push(mem_buf_ptr as i64),
                 Intrinsic::Swap => {
                     let a = pop!();
                     let b = pop!();
@@ -299,6 +327,12 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<()> {
                     stack.push(a);
                     stack.push(b);
                     stack.push(a);
+                }
+                Intrinsic::Argc => {
+                    stack.push(argc as i64);
+                }
+                Intrinsic::Argv => {
+                    stack.push(argv_buf_ptr as i64);
                 }
                 #[allow(unreachable_patterns)]
                 intrinsic => todo!("Implement intrinsic {}", intrinsic),
@@ -391,25 +425,20 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<()> {
             Instruction::Op(Op::Store) => {
                 let val = pop!() % 0xFF;
                 let addr = pop!();
-                if addr > (STR_CAPACITY + BSS_CAPACITY) as i64 {
+                if addr > MEM_LIMIT as i64 {
                     return Err(RuntimeError(InvalidMemoryAccess)).with_context(|| {
-                        format!(
-                            "Invalid memory write: {:x} > {:x}",
-                            addr,
-                            STR_CAPACITY + BSS_CAPACITY
-                        )
+                        format!("Invalid memory write: {:x} > {:x}", addr, MEM_LIMIT)
                     });
                 }
                 bss[addr as usize] = val as u8; // Take lower byte only
             }
             Instruction::Op(Op::Load) => {
                 let addr = pop!();
-                if addr > (STR_CAPACITY + BSS_CAPACITY) as i64 {
+                if addr > MEM_LIMIT as i64 {
                     return Err(RuntimeError(InvalidMemoryAccess)).with_context(|| {
                         format!(
-                            "Invalid memory read: {:x} > {:x}",
-                            addr,
-                            STR_CAPACITY + BSS_CAPACITY
+                            "Invalid memory read at {}: {:x} > {:x}",
+                            ip, addr, MEM_LIMIT
                         )
                     });
                 }
@@ -418,13 +447,9 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<()> {
             Instruction::Op(Op::Store64) => {
                 let val = pop!();
                 let addr = pop!();
-                if addr > (STR_CAPACITY + BSS_CAPACITY) as i64 {
+                if addr > MEM_LIMIT as i64 {
                     return Err(RuntimeError(InvalidMemoryAccess)).with_context(|| {
-                        format!(
-                            "Invalid memory write: {:x} > {:x}",
-                            addr,
-                            STR_CAPACITY + BSS_CAPACITY
-                        )
+                        format!("Invalid memory write: {:x} > {:x}", addr, MEM_LIMIT)
                     });
                 }
                 // Store 8 bytes of value to the address
@@ -439,12 +464,11 @@ pub fn simulate(program: &Program, opt: SimulatorOptions) -> Result<()> {
             }
             Instruction::Op(Op::Load64) => {
                 let addr = pop!();
-                if addr > (STR_CAPACITY + BSS_CAPACITY) as i64 {
+                if addr > MEM_LIMIT as i64 {
                     return Err(RuntimeError(InvalidMemoryAccess)).with_context(|| {
                         format!(
-                            "Invalid memory read: {:x} > {:x}",
-                            addr,
-                            STR_CAPACITY + BSS_CAPACITY
+                            "Invalid memory read at {}: {:x} > {:x}",
+                            ip, addr, MEM_LIMIT
                         )
                     });
                 }

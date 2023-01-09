@@ -1,4 +1,4 @@
-0
-0 10 < if 
-    10 print
-end
+include "std.porth"
+
+argv ,64 dup strlen swap stdout write drop
+"\n" stdout write drop

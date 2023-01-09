@@ -30,9 +30,18 @@ pub fn compile(program: &Program, opt: CompilerOptions) -> Result<PathBuf> {
     label!(asm, "mem");
     asm!(asm, ("resb", "{}", BSS_CAPACITY));
 
+    label!(asm, "args_ptr");
+    asm!(asm, ("resq", "1"));
+
     segment!(asm, "text");
     global!(asm, "_start");
     label!(asm, "_start");
+
+    asm!(
+        asm,
+        /// Save the stack pointer for argc and argv intrinsics
+        ("mov", "[args_ptr], rsp")
+    );
 
     let Program {
         instructions: program,
