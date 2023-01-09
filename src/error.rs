@@ -15,7 +15,7 @@ impl BoolError for bool {
 }
 
 #[derive(Error, Debug)]
-pub enum Error<'e> {
+pub enum Error {
     #[error("[Compile Error] {0}")]
     CompileError(CompileError),
     #[error("[Parse Error] {0}")]
@@ -27,17 +27,25 @@ pub enum Error<'e> {
     #[error("[Runner Error] {0}")]
     RunnerError(RunnerError),
     #[error("[Typecheck Error] {0}")]
-    TypecheckError(TypecheckError<'e>),
+    TypecheckError(TypecheckError),
     #[error("[IO Error] {0}")]
     IOError(IOError),
 }
 
 #[derive(Error, Debug)]
-pub enum TypecheckError<'e> {
+pub enum TypecheckError {
     #[error("Stack Underflow")]
     StackUnderflow,
     #[error("Invalid type for operation {0}")]
-    InvalidTypeForOp(&'e str),
+    InvalidTypeForOp(String),
+    #[error("Unhandled items on stack")]
+    InvalidStack,
+    #[error("Include found in program")]
+    IncludeInCode,
+    #[error("Macro found in program")]
+    MacroInCode,
+    #[error("Invalid end encountered")]
+    InvalidEnd,
 }
 
 #[derive(Error, Debug)]
