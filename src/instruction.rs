@@ -219,7 +219,13 @@ impl std::fmt::Display for SyscallKind {
 }
 
 #[derive(Debug, Clone)]
-pub enum Instruction {
+pub struct Instruction {
+    pub kind: InstructionKind,
+    pub loc: (String, usize, usize),
+}
+
+#[derive(Debug, Clone)]
+pub enum InstructionKind {
     Push(Value),
     Intrinsic(Intrinsic),
     Op(Op),
@@ -228,18 +234,18 @@ pub enum Instruction {
     Syscall(SyscallKind),
 }
 
-impl std::fmt::Display for Instruction {
+impl std::fmt::Display for InstructionKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Instruction::Push(Value::Int(i)) => write!(f, "{}", i),
-            Instruction::Push(Value::Str(s)) => write!(f, "{}", snailquote::escape(s)),
-            Instruction::Push(Value::Char(c)) => write!(f, "'{}'", c),
-            Instruction::Push(Value::Ptr(s)) => write!(f, "{}", s),
-            Instruction::Intrinsic(i) => write!(f, "{}", i),
-            Instruction::Op(o) => write!(f, "{}", o),
-            Instruction::Keyword(k) => write!(f, "{}", k),
-            Instruction::Name(n) => write!(f, "{}", n),
-            Instruction::Syscall(s) => write!(f, "{}", s),
+            InstructionKind::Push(Value::Int(i)) => write!(f, "{}", i),
+            InstructionKind::Push(Value::Str(s)) => write!(f, "{}", snailquote::escape(s)),
+            InstructionKind::Push(Value::Char(c)) => write!(f, "'{}'", c),
+            InstructionKind::Push(Value::Ptr(s)) => write!(f, "{}", s),
+            InstructionKind::Intrinsic(i) => write!(f, "{}", i),
+            InstructionKind::Op(o) => write!(f, "{}", o),
+            InstructionKind::Keyword(k) => write!(f, "{}", k),
+            InstructionKind::Name(n) => write!(f, "{}", n),
+            InstructionKind::Syscall(s) => write!(f, "{}", s),
         }
     }
 }

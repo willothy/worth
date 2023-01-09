@@ -17,7 +17,8 @@ intrinsics!(
     Argc,
     Argv,
     CastPtr = "cast(ptr)",
-    CastInt = "cast(int)"
+    CastInt = "cast(int)",
+    Here
 );
 
 impl Display for Intrinsic {
@@ -26,6 +27,8 @@ impl Display for Intrinsic {
         write!(f, "{}", intrinsic)
     }
 }
+
+pub fn here(asm: &mut Builder) {}
 
 pub fn castptr(asm: &mut Builder) {
     comment!(asm, "-- Cast to Pointer --");

@@ -50,8 +50,8 @@ pub fn compile(program: &Program, opt: CompilerOptions) -> Result<PathBuf> {
     } = program;
 
     for inst in program {
-        match &inst {
-            Instruction::Push(val) => match val {
+        match &inst.kind {
+            InstructionKind::Push(val) => match val {
                 Value::Int(i) => {
                     asm!(asm, ("push", "{}", i))
                 }
@@ -70,7 +70,7 @@ pub fn compile(program: &Program, opt: CompilerOptions) -> Result<PathBuf> {
                     );
                 }
             },
-            Instruction::Intrinsic(intrinsic) => {
+            InstructionKind::Intrinsic(intrinsic) => {
                 comment!(
                     asm,
                     &format!("-- intrinsic: {} --", intrinsic.to_string().to_lowercase())
@@ -78,11 +78,11 @@ pub fn compile(program: &Program, opt: CompilerOptions) -> Result<PathBuf> {
                 intrinsic.compile()(&mut asm);
                 comment!(asm, "-- end intrinsic --");
             }
-            Instruction::Keyword(Keyword::While { self_ip, .. }) => {
+            InstructionKind::Keyword(Keyword::While { self_ip, .. }) => {
                 comment!(asm, "-- while --");
                 label!(asm, "addr_{}", self_ip);
             }
-            Instruction::Keyword(Keyword::Do { end_ip }) => {
+            InstructionKind::Keyword(Keyword::Do { end_ip }) => {
                 asm!(
                     asm,
                     ("pop", "rax"),
@@ -93,7 +93,7 @@ pub fn compile(program: &Program, opt: CompilerOptions) -> Result<PathBuf> {
                 );
                 comment!(asm, "-- do --");
             }
-            Instruction::Keyword(Keyword::If { else_ip }) => {
+            InstructionKind::Keyword(Keyword::If { else_ip }) => {
                 comment!(asm, "-- if --");
                 asm!(
                     asm,
@@ -103,7 +103,7 @@ pub fn compile(program: &Program, opt: CompilerOptions) -> Result<PathBuf> {
                     ("jz", "addr_{}", else_ip)
                 );
             }
-            Instruction::Keyword(Keyword::Else { else_ip, end_ip }) => {
+            InstructionKind::Keyword(Keyword::Else { else_ip, end_ip }) => {
                 comment!(asm, "-- else --");
                 asm!(
                     asm,
@@ -112,7 +112,7 @@ pub fn compile(program: &Program, opt: CompilerOptions) -> Result<PathBuf> {
                 );
                 label!(asm, "addr_{}", else_ip);
             }
-            Instruction::Keyword(Keyword::End { self_ip, while_ip }) => {
+            InstructionKind::Keyword(Keyword::End { self_ip, while_ip }) => {
                 comment!(asm, "-- end --");
                 if let Some(while_ip) = while_ip {
                     asm!(
@@ -123,44 +123,44 @@ pub fn compile(program: &Program, opt: CompilerOptions) -> Result<PathBuf> {
                 }
                 label!(asm, "addr_{}", self_ip);
             }
-            Instruction::Op(Op::Add) => ops::add(&mut asm),
-            Instruction::Op(Op::Sub) => ops::sub(&mut asm),
-            Instruction::Op(Op::Mul) => ops::mul(&mut asm),
-            Instruction::Op(Op::Div) => ops::div(&mut asm),
-            Instruction::Op(Op::Mod) => ops::mod_(&mut asm),
-            Instruction::Op(Op::DivMod) => ops::divmod(&mut asm),
-            Instruction::Op(Op::BitwiseAnd) => ops::band(&mut asm),
-            Instruction::Op(Op::BitwiseOr) => ops::bor(&mut asm),
-            Instruction::Op(Op::BitwiseXor) => ops::xor(&mut asm),
-            Instruction::Op(Op::BitwiseNot) => ops::not(&mut asm),
-            Instruction::Op(Op::Shl) => ops::shl(&mut asm),
-            Instruction::Op(Op::Shr) => ops::shr(&mut asm),
-            Instruction::Op(Op::Eq) => ops::eq(&mut asm),
-            Instruction::Op(Op::Neq) => ops::neq(&mut asm),
-            Instruction::Op(Op::Lt) => ops::lt(&mut asm),
-            Instruction::Op(Op::Gt) => ops::gt(&mut asm),
-            Instruction::Op(Op::Lte) => ops::lte(&mut asm),
-            Instruction::Op(Op::Gte) => ops::gte(&mut asm),
-            Instruction::Op(Op::Load) => ops::load(&mut asm),
-            Instruction::Op(Op::Store) => ops::store(&mut asm),
-            Instruction::Op(Op::Load64) => ops::load64(&mut asm),
-            Instruction::Op(Op::Store64) => ops::store64(&mut asm),
-            Instruction::Syscall(SyscallKind::Syscall0) => ops::syscall0(&mut asm),
-            Instruction::Syscall(SyscallKind::Syscall1) => ops::syscall1(&mut asm),
-            Instruction::Syscall(SyscallKind::Syscall2) => ops::syscall2(&mut asm),
-            Instruction::Syscall(SyscallKind::Syscall3) => ops::syscall3(&mut asm),
-            Instruction::Syscall(SyscallKind::Syscall4) => ops::syscall4(&mut asm),
-            Instruction::Syscall(SyscallKind::Syscall5) => ops::syscall5(&mut asm),
-            Instruction::Syscall(SyscallKind::Syscall6) => ops::syscall6(&mut asm),
-            Instruction::Keyword(Keyword::Include) => {
+            InstructionKind::Op(Op::Add) => ops::add(&mut asm),
+            InstructionKind::Op(Op::Sub) => ops::sub(&mut asm),
+            InstructionKind::Op(Op::Mul) => ops::mul(&mut asm),
+            InstructionKind::Op(Op::Div) => ops::div(&mut asm),
+            InstructionKind::Op(Op::Mod) => ops::mod_(&mut asm),
+            InstructionKind::Op(Op::DivMod) => ops::divmod(&mut asm),
+            InstructionKind::Op(Op::BitwiseAnd) => ops::band(&mut asm),
+            InstructionKind::Op(Op::BitwiseOr) => ops::bor(&mut asm),
+            InstructionKind::Op(Op::BitwiseXor) => ops::xor(&mut asm),
+            InstructionKind::Op(Op::BitwiseNot) => ops::not(&mut asm),
+            InstructionKind::Op(Op::Shl) => ops::shl(&mut asm),
+            InstructionKind::Op(Op::Shr) => ops::shr(&mut asm),
+            InstructionKind::Op(Op::Eq) => ops::eq(&mut asm),
+            InstructionKind::Op(Op::Neq) => ops::neq(&mut asm),
+            InstructionKind::Op(Op::Lt) => ops::lt(&mut asm),
+            InstructionKind::Op(Op::Gt) => ops::gt(&mut asm),
+            InstructionKind::Op(Op::Lte) => ops::lte(&mut asm),
+            InstructionKind::Op(Op::Gte) => ops::gte(&mut asm),
+            InstructionKind::Op(Op::Load) => ops::load(&mut asm),
+            InstructionKind::Op(Op::Store) => ops::store(&mut asm),
+            InstructionKind::Op(Op::Load64) => ops::load64(&mut asm),
+            InstructionKind::Op(Op::Store64) => ops::store64(&mut asm),
+            InstructionKind::Syscall(SyscallKind::Syscall0) => ops::syscall0(&mut asm),
+            InstructionKind::Syscall(SyscallKind::Syscall1) => ops::syscall1(&mut asm),
+            InstructionKind::Syscall(SyscallKind::Syscall2) => ops::syscall2(&mut asm),
+            InstructionKind::Syscall(SyscallKind::Syscall3) => ops::syscall3(&mut asm),
+            InstructionKind::Syscall(SyscallKind::Syscall4) => ops::syscall4(&mut asm),
+            InstructionKind::Syscall(SyscallKind::Syscall5) => ops::syscall5(&mut asm),
+            InstructionKind::Syscall(SyscallKind::Syscall6) => ops::syscall6(&mut asm),
+            InstructionKind::Keyword(Keyword::Include) => {
                 return Err(CompileError(UnexpectedToken("include".into())))
                     .with_context(|| "Include should be expanded before codegen")
             }
-            Instruction::Keyword(Keyword::Macro) => {
+            InstructionKind::Keyword(Keyword::Macro) => {
                 return Err(CompileError(UnexpectedToken("macro".into())))
                     .with_context(|| "Macro should be expanded before codegen")
             }
-            Instruction::Name(name) => {
+            InstructionKind::Name(name) => {
                 return Err(CompileError(UnexpectedToken("macro".into())))
                     .with_context(|| format!("Name {} should be resolved before codegen", name))
             }

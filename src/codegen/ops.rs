@@ -196,8 +196,8 @@ pub fn lte(asm: &mut Builder) {
         asm,
         ("mov", "rcx, 0"),
         ("mov", "rdx, 1"),
-        ("pop", "rax"),
         ("pop", "rbx"),
+        ("pop", "rax"),
         ("cmp", "rax, rbx"),
         ("cmovle", "rcx, rdx"),
         ("push", "rcx")
@@ -210,8 +210,8 @@ pub fn gte(asm: &mut Builder) {
         asm,
         ("mov", "rcx, 0"),
         ("mov", "rdx, 1"),
-        ("pop", "rax"),
         ("pop", "rbx"),
+        ("pop", "rax"),
         ("cmp", "rax, rbx"),
         ("cmovge", "rcx, rdx"),
         ("push", "rcx")

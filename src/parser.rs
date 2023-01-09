@@ -7,7 +7,7 @@ use crate::{
         IOError::InvalidPath,
         ParseError::*,
     },
-    instruction::{self, Instruction, Keyword, Op, Program, Value},
+    instruction::{self, Instruction, InstructionKind, Keyword, Op, Program, Value},
 };
 use anyhow::{anyhow, Context, Result};
 use nom::{
@@ -55,13 +55,13 @@ pub fn parse(source: String, name: &str, path: PathBuf) -> Result<Program> {
         instructions: tokens
             .iter()
             .map(|t| {
-                Ok(match &t.ty {
-                    TokenType::Intrinsic(i) => Instruction::Intrinsic(i.clone()),
-                    TokenType::Name => Instruction::Name(t.value.clone()),
-                    TokenType::Op => Instruction::Op(Op::from_str(&t.value)?),
-                    TokenType::Keyword => Instruction::Keyword(Keyword::from_str(&t.value)?),
-                    TokenType::Value(v) => Instruction::Push(v.clone()),
-                    TokenType::Syscall(n) => Instruction::Syscall(match *n {
+                let ty = match &t.ty {
+                    TokenType::Intrinsic(i) => InstructionKind::Intrinsic(i.clone()),
+                    TokenType::Name => InstructionKind::Name(t.value.clone()),
+                    TokenType::Op => InstructionKind::Op(Op::from_str(&t.value)?),
+                    TokenType::Keyword => InstructionKind::Keyword(Keyword::from_str(&t.value)?),
+                    TokenType::Value(v) => InstructionKind::Push(v.clone()),
+                    TokenType::Syscall(n) => InstructionKind::Syscall(match *n {
                         0 => instruction::SyscallKind::Syscall0,
                         1 => instruction::SyscallKind::Syscall1,
                         2 => instruction::SyscallKind::Syscall2,
@@ -75,7 +75,12 @@ pub fn parse(source: String, name: &str, path: PathBuf) -> Result<Program> {
                         return Err(ParseError(UnexpectedToken("comment".into())))
                             .with_context(|| "Comment should be filtered out")
                     }
-                })
+                };
+                let inst = Instruction {
+                    kind: ty,
+                    loc: t.location.clone(),
+                };
+                Ok(inst)
             })
             .collect::<Result<Vec<_>>>()?,
         macros: HashMap::new(),

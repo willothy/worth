@@ -131,8 +131,8 @@ pub fn simulate(program: &Program, mut opt: SimulatorOptions) -> Result<()> {
             debug,
         );
 
-        match &inst {
-            Instruction::Push(val) => match val {
+        match &inst.kind {
+            InstructionKind::Push(val) => match val {
                 Value::Int(i) => stack.push(*i),
                 Value::Char(c) => stack.push((*c) as i64),
                 Value::Str(s) => {
@@ -153,13 +153,13 @@ pub fn simulate(program: &Program, mut opt: SimulatorOptions) -> Result<()> {
                 }
                 Value::Ptr(_name) => todo!(),
             },
-            Instruction::Syscall(SyscallKind::Syscall0) => {
+            InstructionKind::Syscall(SyscallKind::Syscall0) => {
                 let syscall = pop!();
                 match syscall {
                     number => todo!("Implement syscall0 {}", number),
                 }
             }
-            Instruction::Syscall(SyscallKind::Syscall1) => {
+            InstructionKind::Syscall(SyscallKind::Syscall1) => {
                 let syscall = pop!();
                 let arg1 = pop!();
                 match syscall {
@@ -175,7 +175,7 @@ pub fn simulate(program: &Program, mut opt: SimulatorOptions) -> Result<()> {
                 }
             }
             #[allow(unused_variables)]
-            Instruction::Syscall(SyscallKind::Syscall2) => {
+            InstructionKind::Syscall(SyscallKind::Syscall2) => {
                 let syscall = pop!();
                 let arg1 = pop!();
                 let arg2 = pop!();
@@ -183,7 +183,7 @@ pub fn simulate(program: &Program, mut opt: SimulatorOptions) -> Result<()> {
                     number => todo!("Implement syscall2 {}", number),
                 }
             }
-            Instruction::Syscall(SyscallKind::Syscall3) => {
+            InstructionKind::Syscall(SyscallKind::Syscall3) => {
                 let syscall = pop!();
                 let arg1 = pop!();
                 let arg2 = pop!();
@@ -194,18 +194,19 @@ pub fn simulate(program: &Program, mut opt: SimulatorOptions) -> Result<()> {
                         let fd = arg1 as usize;
                         let buf = arg2 as usize;
                         let count = arg3 as usize;
+                        //let mut tmp_buf = String::new();
                         let buf = &mut bss[buf..buf + count];
-                        fds[fd]
+                        let bytes_read = fds[fd]
                             .reader
                             .as_mut()
                             .with_context(|| {
                                 format!("File descriptor {} is not opened for reading", fd)
                             })?
-                            .read_exact(buf)
+                            .read(buf)
                             .with_context(|| {
                                 format!("Failed to read from file descriptor {}", fd)
                             })?;
-                        stack.push(count as i64);
+                        stack.push(bytes_read as i64);
                     }
                     1 => {
                         // Write
@@ -240,7 +241,7 @@ pub fn simulate(program: &Program, mut opt: SimulatorOptions) -> Result<()> {
                 }
             }
             #[allow(unused_variables)]
-            Instruction::Syscall(SyscallKind::Syscall4) => {
+            InstructionKind::Syscall(SyscallKind::Syscall4) => {
                 let syscall = pop!();
                 let arg1 = pop!();
                 let arg2 = pop!();
@@ -251,7 +252,7 @@ pub fn simulate(program: &Program, mut opt: SimulatorOptions) -> Result<()> {
                 }
             }
             #[allow(unused_variables)]
-            Instruction::Syscall(SyscallKind::Syscall5) => {
+            InstructionKind::Syscall(SyscallKind::Syscall5) => {
                 let syscall = pop!();
                 let arg1 = pop!();
                 let arg2 = pop!();
@@ -263,7 +264,7 @@ pub fn simulate(program: &Program, mut opt: SimulatorOptions) -> Result<()> {
                 }
             }
             #[allow(unused_variables)]
-            Instruction::Syscall(SyscallKind::Syscall6) => {
+            InstructionKind::Syscall(SyscallKind::Syscall6) => {
                 let syscall = pop!();
                 let arg1 = pop!();
                 let arg2 = pop!();
@@ -275,8 +276,8 @@ pub fn simulate(program: &Program, mut opt: SimulatorOptions) -> Result<()> {
                     number => todo!("Implement syscall6 {}", number),
                 }
             }
-            Instruction::Keyword(Keyword::While { .. }) => {}
-            Instruction::Keyword(Keyword::Do { end_ip }) => {
+            InstructionKind::Keyword(Keyword::While { .. }) => {}
+            InstructionKind::Keyword(Keyword::Do { end_ip }) => {
                 let a = pop!();
                 if a == 0 {
                     ip = *end_ip + 1;
@@ -288,7 +289,7 @@ pub fn simulate(program: &Program, mut opt: SimulatorOptions) -> Result<()> {
                     continue;
                 }
             }
-            Instruction::Keyword(Keyword::If { else_ip }) => {
+            InstructionKind::Keyword(Keyword::If { else_ip }) => {
                 let a = pop!();
                 if a == 0 {
                     ip = *else_ip + 1;
@@ -300,7 +301,7 @@ pub fn simulate(program: &Program, mut opt: SimulatorOptions) -> Result<()> {
                     continue;
                 }
             }
-            Instruction::Keyword(Keyword::Else { end_ip, .. }) => {
+            InstructionKind::Keyword(Keyword::Else { end_ip, .. }) => {
                 ip = *end_ip;
                 if opt.step {
                     println!("{}: {:?}", ip, inst);
@@ -309,7 +310,7 @@ pub fn simulate(program: &Program, mut opt: SimulatorOptions) -> Result<()> {
                 }
                 continue;
             }
-            Instruction::Keyword(Keyword::End { while_ip, .. }) => {
+            InstructionKind::Keyword(Keyword::End { while_ip, .. }) => {
                 if let Some(while_ip) = while_ip {
                     ip = *while_ip;
                     if opt.step {
@@ -321,7 +322,7 @@ pub fn simulate(program: &Program, mut opt: SimulatorOptions) -> Result<()> {
                 }
             }
 
-            Instruction::Intrinsic(intrinsic) => match intrinsic {
+            InstructionKind::Intrinsic(intrinsic) => match intrinsic {
                 Intrinsic::Panic => std::process::exit(1),
                 Intrinsic::Print => {
                     let a = pop!();
@@ -372,97 +373,97 @@ pub fn simulate(program: &Program, mut opt: SimulatorOptions) -> Result<()> {
                 #[allow(unreachable_patterns)]
                 intrinsic => todo!("Implement intrinsic {}", intrinsic),
             },
-            Instruction::Op(Op::Add) => {
+            InstructionKind::Op(Op::Add) => {
                 let a = pop!();
                 let b = pop!();
                 stack.push(a + b);
             }
-            Instruction::Op(Op::Sub) => {
+            InstructionKind::Op(Op::Sub) => {
                 let a = pop!();
                 let b = pop!();
                 stack.push(b - a);
             }
-            Instruction::Op(Op::Mul) => {
+            InstructionKind::Op(Op::Mul) => {
                 let a = pop!();
                 let b = pop!();
                 stack.push(a * b);
             }
-            Instruction::Op(Op::Div) => {
+            InstructionKind::Op(Op::Div) => {
                 let a = pop!();
                 let b = pop!();
                 stack.push(b / a);
             }
-            Instruction::Op(Op::Mod) => {
+            InstructionKind::Op(Op::Mod) => {
                 let a = pop!();
                 let b = pop!();
                 stack.push(b % a);
             }
-            Instruction::Op(Op::DivMod) => {
+            InstructionKind::Op(Op::DivMod) => {
                 let a = pop!();
                 let b = pop!();
                 stack.push(b / a);
                 stack.push(b % a);
             }
-            Instruction::Op(Op::BitwiseAnd) => {
+            InstructionKind::Op(Op::BitwiseAnd) => {
                 let a = pop!();
                 let b = pop!();
                 stack.push(a & b);
             }
-            Instruction::Op(Op::BitwiseOr) => {
+            InstructionKind::Op(Op::BitwiseOr) => {
                 let a = pop!();
                 let b = pop!();
                 stack.push(a | b);
             }
-            Instruction::Op(Op::BitwiseXor) => {
+            InstructionKind::Op(Op::BitwiseXor) => {
                 let a = pop!();
                 let b = pop!();
                 stack.push(a ^ b);
             }
-            Instruction::Op(Op::BitwiseNot) => {
+            InstructionKind::Op(Op::BitwiseNot) => {
                 let a = pop!();
                 stack.push(!a);
             }
-            Instruction::Op(Op::Shl) => {
+            InstructionKind::Op(Op::Shl) => {
                 let a = pop!();
                 let b = pop!();
                 stack.push(b << a);
             }
-            Instruction::Op(Op::Shr) => {
+            InstructionKind::Op(Op::Shr) => {
                 let a = pop!();
                 let b = pop!();
                 stack.push(b >> a);
             }
-            Instruction::Op(Op::Eq) => {
+            InstructionKind::Op(Op::Eq) => {
                 let a = pop!();
                 let b = pop!();
                 stack.push((a == b) as i64);
             }
-            Instruction::Op(Op::Neq) => {
+            InstructionKind::Op(Op::Neq) => {
                 let a = pop!();
                 let b = pop!();
                 stack.push((a != b) as i64);
             }
-            Instruction::Op(Op::Lt) => {
+            InstructionKind::Op(Op::Lt) => {
                 let a = pop!();
                 let b = pop!();
                 stack.push((b < a) as i64);
             }
-            Instruction::Op(Op::Gt) => {
+            InstructionKind::Op(Op::Gt) => {
                 let a = pop!();
                 let b = pop!();
                 stack.push((b > a) as i64);
             }
-            Instruction::Op(Op::Lte) => {
+            InstructionKind::Op(Op::Lte) => {
                 let a = pop!();
                 let b = pop!();
                 stack.push((b <= a) as i64);
             }
-            Instruction::Op(Op::Gte) => {
+            InstructionKind::Op(Op::Gte) => {
                 let a = pop!();
                 let b = pop!();
                 stack.push((b >= a) as i64);
             }
-            Instruction::Op(Op::Store) => {
+            InstructionKind::Op(Op::Store) => {
                 let val = pop!() % 0xFF;
                 let addr = pop!();
                 if addr > MEM_LIMIT as i64 {
@@ -472,7 +473,7 @@ pub fn simulate(program: &Program, mut opt: SimulatorOptions) -> Result<()> {
                 }
                 bss[addr as usize] = val as u8; // Take lower byte only
             }
-            Instruction::Op(Op::Load) => {
+            InstructionKind::Op(Op::Load) => {
                 let addr = pop!();
                 if addr > MEM_LIMIT as i64 {
                     return Err(RuntimeError(InvalidMemoryAccess)).with_context(|| {
@@ -484,7 +485,7 @@ pub fn simulate(program: &Program, mut opt: SimulatorOptions) -> Result<()> {
                 }
                 stack.push(bss[addr as usize] as i64);
             }
-            Instruction::Op(Op::Store64) => {
+            InstructionKind::Op(Op::Store64) => {
                 let val = pop!();
                 let addr = pop!();
                 if addr > MEM_LIMIT as i64 {
@@ -502,7 +503,7 @@ pub fn simulate(program: &Program, mut opt: SimulatorOptions) -> Result<()> {
                 bss[addr as usize + 6] = (val >> 8) as u8;
                 bss[addr as usize + 7] = val as u8;
             }
-            Instruction::Op(Op::Load64) => {
+            InstructionKind::Op(Op::Load64) => {
                 let addr = pop!();
                 if addr > MEM_LIMIT as i64 {
                     return Err(RuntimeError(InvalidMemoryAccess)).with_context(|| {
@@ -523,11 +524,11 @@ pub fn simulate(program: &Program, mut opt: SimulatorOptions) -> Result<()> {
                     | bss[addr as usize + 7] as i64;
                 stack.push(val);
             }
-            Instruction::Keyword(Keyword::Macro) => {
+            InstructionKind::Keyword(Keyword::Macro) => {
                 return Err(RuntimeError(MacroNotExpanded))
                     .with_context(|| format!("Encountered macro definition at {}", ip))
             }
-            Instruction::Name(name) => {
+            InstructionKind::Name(name) => {
                 return Err(RuntimeError(NameNotResolved))
                     .with_context(|| format!("Encountered unresolved name at {}: {}", ip, name));
             }

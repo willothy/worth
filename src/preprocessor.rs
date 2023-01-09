@@ -1,10 +1,15 @@
 use std::path::PathBuf;
 
+use crate::codegen::intrinsics::Intrinsic;
 use crate::error::{Error::PreprocessorError, PreprocessorError::*};
-use crate::instruction::{Instruction, Keyword, Macro, Program, Value};
+use crate::instruction::{Instruction, InstructionKind, Keyword, Macro, Program, Value};
 use anyhow::{Context, Result};
 
 pub fn process(mut program: Program) -> Result<Program> {
+    here(&mut program).context(format!(
+        "Failed to process heres for {}.porth",
+        program.name
+    ))?;
     includes(&mut program, 0).context(format!(
         "Failed to process includes for {}.porth",
         program.name
@@ -31,6 +36,24 @@ pub fn process(mut program: Program) -> Result<Program> {
     Ok(program)
 }
 
+fn here(program: &mut Program) -> Result<()> {
+    for instruction in &mut program.instructions {
+        match instruction.kind {
+            InstructionKind::Intrinsic(Intrinsic::Here) => {
+                let loc = instruction.loc.clone();
+                *instruction = Instruction {
+                    kind: InstructionKind::Push(Value::Str(
+                        loc.0.clone() + ":" + &loc.1.to_string() + ":" + &loc.2.to_string(),
+                    )),
+                    loc: loc,
+                };
+            }
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
 fn includes(program: &mut Program, depth: usize) -> Result<()> {
     // TODO: Safety method for recursive includes
     // TODO: Search path for includes
@@ -48,15 +71,15 @@ fn includes(program: &mut Program, depth: usize) -> Result<()> {
             break;
         };
 
-        match instruction {
-            Instruction::Keyword(Keyword::Include) => {
+        match instruction.kind {
+            InstructionKind::Keyword(Keyword::Include) => {
                 inst_to_remove.push(ip);
 
                 let Some((ip, include)) = instructions.next() else {
                     break;
                 };
-                match include {
-                    Instruction::Push(Value::Str(path)) => {
+                match &include.kind {
+                    InstructionKind::Push(Value::Str(path)) => {
                         include_paths.push(PathBuf::from(path));
                         inst_to_remove.push(ip);
                     }
@@ -117,8 +140,8 @@ fn includes(program: &mut Program, depth: usize) -> Result<()> {
             .to_string_lossy()
             .to_string();
         let mut include_program = crate::parser::parse(include_file, &name, include_path.clone())?;
+        here(&mut include_program)?;
         includes(&mut include_program, depth + 1)?;
-
         program
             .instructions
             .append(&mut include_program.instructions);
@@ -134,19 +157,19 @@ fn collect_macros(program: &mut Program) -> Result<()> {
 
     // Collect macros
     for (ip, instruction) in program.instructions.iter().enumerate() {
-        match instruction {
-            Instruction::Keyword(Keyword::Macro) => {
+        match &instruction.kind {
+            InstructionKind::Keyword(Keyword::Macro) => {
                 macro_stack.push(("macro", ip));
                 in_macro = true;
                 continue;
             }
-            Instruction::Name(name) => {
+            InstructionKind::Name(name) => {
                 if in_macro && macro_name.is_empty() {
                     macro_name = name.clone();
                     continue;
                 }
             }
-            Instruction::Keyword(Keyword::End { .. }) => {
+            InstructionKind::Keyword(Keyword::End { .. }) => {
                 let (kind, start_ip) = macro_stack.pop().unwrap();
                 assert!(
                     kind == "macro"
@@ -183,16 +206,16 @@ fn collect_macros(program: &mut Program) -> Result<()> {
                     _ => {}
                 }
             }
-            Instruction::Keyword(Keyword::If { .. }) => {
+            InstructionKind::Keyword(Keyword::If { .. }) => {
                 macro_stack.push(("if", ip));
             }
-            Instruction::Keyword(Keyword::Else { .. }) => {
+            InstructionKind::Keyword(Keyword::Else { .. }) => {
                 macro_stack.push(("else", ip));
             }
-            Instruction::Keyword(Keyword::While { .. }) => {
+            InstructionKind::Keyword(Keyword::While { .. }) => {
                 macro_stack.push(("while", ip));
             }
-            Instruction::Keyword(Keyword::Do { .. }) => {
+            InstructionKind::Keyword(Keyword::Do { .. }) => {
                 assert!(macro_stack.pop().unwrap().0 == "while");
                 macro_stack.push(("do", ip));
             }
@@ -241,14 +264,14 @@ fn expand_macros(program: &mut Program) -> Result<bool> {
     let mut new_instructions = Vec::new();
     macro_stack.clear();
     let mut in_macro = false;
-    for inst in program.instructions.iter() {
-        match inst {
-            Instruction::Keyword(Keyword::Macro) => {
+    for instruction in program.instructions.iter() {
+        match &instruction.kind {
+            InstructionKind::Keyword(Keyword::Macro) => {
                 macro_stack.push(("macro", 0));
                 in_macro = true;
                 continue;
             }
-            Instruction::Name(name) => {
+            InstructionKind::Name(name) => {
                 if !in_macro {
                     if let Some(macro_) = program.macros.get(name) {
                         new_instructions.extend(macro_.body.clone());
@@ -257,17 +280,17 @@ fn expand_macros(program: &mut Program) -> Result<bool> {
                     }
                 }
             }
-            Instruction::Keyword(Keyword::While { .. }) => {
+            InstructionKind::Keyword(Keyword::While { .. }) => {
                 macro_stack.push(("while", 0));
             }
-            Instruction::Keyword(Keyword::Do { .. }) => {
+            InstructionKind::Keyword(Keyword::Do { .. }) => {
                 assert!(macro_stack.pop().unwrap().0 == "while");
                 macro_stack.push(("do", 0));
             }
-            Instruction::Keyword(Keyword::If { .. }) => {
+            InstructionKind::Keyword(Keyword::If { .. }) => {
                 macro_stack.push(("if", 0));
             }
-            Instruction::Keyword(Keyword::Else { .. }) => {
+            InstructionKind::Keyword(Keyword::Else { .. }) => {
                 let pred = macro_stack.pop().unwrap().0;
                 if pred != "if" {
                     return Err(PreprocessorError(UnexpectedKeyword))
@@ -275,7 +298,7 @@ fn expand_macros(program: &mut Program) -> Result<bool> {
                 }
                 macro_stack.push(("else", 0));
             }
-            Instruction::Keyword(Keyword::End { .. }) => {
+            InstructionKind::Keyword(Keyword::End { .. }) => {
                 let (kind, _) = macro_stack.pop().unwrap();
 
                 if ["macro", "if", "else", "while", "do"]
@@ -304,7 +327,7 @@ fn expand_macros(program: &mut Program) -> Result<bool> {
             _ => {}
         }
         if !in_macro {
-            new_instructions.push(inst.clone());
+            new_instructions.push(instruction.clone());
         }
     }
     program.instructions = new_instructions;
@@ -314,11 +337,11 @@ fn expand_macros(program: &mut Program) -> Result<bool> {
 fn jumps(program: &mut Program) -> Result<()> {
     let mut jump_stack = Vec::new();
     for (ip, instruction) in program.instructions.iter_mut().enumerate() {
-        match instruction {
-            Instruction::Keyword(Keyword::If { else_ip }) => {
+        match &mut instruction.kind {
+            InstructionKind::Keyword(Keyword::If { else_ip }) => {
                 jump_stack.push(("if", 0, else_ip));
             }
-            Instruction::Keyword(Keyword::Else { else_ip, end_ip }) => {
+            InstructionKind::Keyword(Keyword::Else { else_ip, end_ip }) => {
                 let (kind, _, precursor_else_ip) = jump_stack.pop().unwrap();
                 if kind != "if" {
                     return Err(PreprocessorError(UnexpectedKeyword))
@@ -328,7 +351,7 @@ fn jumps(program: &mut Program) -> Result<()> {
                 *else_ip = ip;
                 jump_stack.push(("else", 0, end_ip));
             }
-            Instruction::Keyword(Keyword::End {
+            InstructionKind::Keyword(Keyword::End {
                 self_ip,
                 while_ip: end_ip,
             }) => {
@@ -344,11 +367,11 @@ fn jumps(program: &mut Program) -> Result<()> {
                     *end_ip = Some(while_ip);
                 }
             }
-            Instruction::Keyword(Keyword::While { self_ip, do_ip }) => {
+            InstructionKind::Keyword(Keyword::While { self_ip, do_ip }) => {
                 *self_ip = ip;
                 jump_stack.push(("while", ip, do_ip));
             }
-            Instruction::Keyword(Keyword::Do { end_ip }) => {
+            InstructionKind::Keyword(Keyword::Do { end_ip }) => {
                 let (kind, while_ip, precursor_do_ip) = jump_stack.pop().unwrap();
                 if kind != "while" {
                     return Err(PreprocessorError(UnexpectedKeyword))

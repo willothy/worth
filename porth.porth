@@ -1,0 +1,13 @@
+include "std.porth"
+
+macro OP_PUSH_INT 0 end
+macro OP_PLUS     1 end
+macro OP_PRINT    2 end
+
+macro ops-count mem end
+macro ops ops-count 8 + end
+
+macro push-op
+    
+
+end
