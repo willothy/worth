@@ -114,6 +114,8 @@ pub enum PreprocessorError {
     RecursiveInclude,
     #[error("Unexpected keyword {0}")]
     UnexpectedKeyword(String),
+    #[error("Unexpected macro end")]
+    UnexpectedMacroEnd,
 }
 
 #[derive(Error, Debug)]
@@ -147,25 +149,17 @@ pub fn err_spread(program: &Vec<Instruction>, ip: usize, secondary: Option<usize
     let mut prev_was_newline = false;
     let output = program[spread.clone()]
         .iter()
-        .enumerate()
-        .map(|(idx, i)| {
+        .map(|i| {
             let mut out = String::new();
             let kind_str = i.kind.to_string();
-            let err_location = {
-                let len = spread.len();
-                if len % 2 == 0 {
-                    len / 2 + 1
-                } else {
-                    len / 2
-                }
-            };
+            let err_location = ip;
 
             if kind_str == "else" || kind_str == "end" {
                 out += "\n";
             }
 
             if prev_was_newline {
-                if idx == err_location && nest_level > 0 {
+                if i.ip == err_location && nest_level > 0 {
                     for _ in 0..nest_level - 1 {
                         out.insert_str(0, "    ");
                     }
@@ -176,7 +170,7 @@ pub fn err_spread(program: &Vec<Instruction>, ip: usize, secondary: Option<usize
                 }
             }
 
-            out += &if idx == err_location {
+            out += &if i.ip == err_location {
                 format!("\x1b[31;1m>>> {}\x1b[0m", i.kind.to_string())
             } else if secondary.is_some() && i.ip == secondary.unwrap() {
                 format!("\x1b[33m{}\x1b[0m", i.kind.to_string())
@@ -204,4 +198,39 @@ pub fn err_spread(program: &Vec<Instruction>, ip: usize, secondary: Option<usize
 
 pub fn err_loc(loc: &(String, usize, usize)) -> String {
     format!("{}:{}:{}", loc.0, loc.1, loc.2)
+}
+
+pub fn kw_str(kw: &str) -> &str {
+    match kw {
+        "whiledo" => "while ... do",
+        "ifdo" => "if ... do",
+        "elifdo" => "elif ... do",
+        kw => kw,
+    }
+}
+
+#[macro_export]
+macro_rules! err {
+    ($program:ident, $kind:expr, $msg:expr, $ip:expr) => {
+        return Err($kind).with_context(|| {
+            use crate::error::{err_loc, err_spread};
+            format!(
+                "{}\n\n{}\n{}\n",
+                $msg,
+                err_spread(&$program.instructions, $ip, None),
+                err_loc(&$program.instructions[$ip].loc)
+            )
+        })
+    };
+    ($program:ident, $kind:expr, $msg:expr, $ip:expr, $last_ip:expr) => {
+        return Err($kind).with_context(|| {
+            use crate::error::{err_loc, err_spread};
+            format!(
+                "{}\n\n{}\n{}\n",
+                $msg,
+                err_spread(&$program.instructions, $ip, $last_ip),
+                err_loc(&$program.instructions[$ip].loc)
+            )
+        })
+    };
 }

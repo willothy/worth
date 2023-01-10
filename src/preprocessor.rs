@@ -1,9 +1,8 @@
-use std::cell::RefCell;
 use std::path::PathBuf;
-use std::rc::Rc;
 
 use crate::codegen::intrinsics::Intrinsic;
-use crate::error::{err_loc, err_spread};
+use crate::err;
+use crate::error::kw_str;
 use crate::error::{Error::PreprocessorError, PreprocessorError::*};
 use crate::instruction::{Instruction, InstructionKind, Keyword, Macro, Program, Value};
 use anyhow::{Context, Result};
@@ -28,15 +27,27 @@ pub fn process(mut program: Program) -> Result<Program> {
     ))? == true
     {
         if depth >= 100 {
-            return Err(PreprocessorError(TooManyMacroExpansions).into());
+            err!(
+                program,
+                PreprocessorError(TooManyMacroExpansions),
+                "Passed maximum macro recursion depth",
+                0
+            );
         }
         depth += 1;
     }
+    ips(&mut program);
     jumps(&mut program).context(format!(
-        "Failed to process jumps for {}.porth",
+        "Failed to validate control flow for {}.porth",
         program.name
     ))?;
     Ok(program)
+}
+
+fn ips(program: &mut Program) {
+    for (ip, instruction) in program.instructions.iter_mut().enumerate() {
+        instruction.ip = ip;
+    }
 }
 
 fn here(program: &mut Program) -> Result<()> {
@@ -65,34 +76,68 @@ fn includes(program: &mut Program, depth: usize) -> Result<()> {
 
     let mut instructions = program.instructions.iter().enumerate();
     if depth > 100 {
-        return Err(PreprocessorError(RecursiveInclude))
-            .with_context(|| format!("Invalid include"));
+        err!(
+            program,
+            PreprocessorError(RecursiveInclude),
+            "Passed maximum include recursion depth",
+            0
+        );
     }
     // Collect includes
     loop {
         let Some((ip, instruction)) = instructions.next() else {
             break;
         };
+        if let InstructionKind::Keyword(Keyword::Include) = instruction.kind {
+            inst_to_remove.push(ip);
 
-        match instruction.kind {
-            InstructionKind::Keyword(Keyword::Include) => {
-                inst_to_remove.push(ip);
-
-                let Some((ip, include)) = instructions.next() else {
-                    break;
-                };
-                match &include.kind {
-                    InstructionKind::Push(Value::Str(path)) => {
-                        include_paths.push(PathBuf::from(path));
-                        inst_to_remove.push(ip);
-                    }
-                    other => {
-                        return Err(PreprocessorError(InvalidInclude(other.to_string())).into())
-                    }
+            let Some((ip, include)) = instructions.next() else {
+                break;
+            };
+            match &include.kind {
+                InstructionKind::Push(Value::Str(path)) => {
+                    include_paths.push((PathBuf::from(path), ip));
+                    inst_to_remove.push(ip);
                 }
+                other => err!(
+                    program,
+                    PreprocessorError(InvalidInclude(other.to_string())),
+                    format!(
+                        "Invalid include: Expected string literal include path, found {}",
+                        other
+                    ),
+                    ip
+                ),
             }
-            _ => {}
         }
+    }
+
+    // Process includes
+    let base_path = program.base_path.clone();
+    for (include, include_ip) in &mut include_paths {
+        let include_path = base_path.join(&include);
+        if !include_path.exists() {
+            err!(
+                program,
+                PreprocessorError(IncludeNotFound(
+                    include.clone().to_string_lossy().to_string(),
+                )),
+                format!("Invalid include {:?}", include),
+                *include_ip
+            );
+        }
+        let Ok(include_path) = include_path
+            .canonicalize() else {
+                err!(
+                    program,
+                    PreprocessorError(IncludeNotFound(
+                        include.clone().to_string_lossy().to_string(),
+                    )),
+                    format!("Failed to canonicalize include path {:?}", include),
+                    *include_ip
+                );
+            };
+        *include = include_path;
     }
 
     // Remove include instructions
@@ -102,46 +147,30 @@ fn includes(program: &mut Program, depth: usize) -> Result<()> {
         offset += 1;
     }
 
-    // Process includes
-    let base_path = program.base_path.clone();
-    for include in &mut include_paths {
+    for (include, include_ip) in &include_paths {
         let include_path = base_path.join(&include);
-        if !include_path.exists() {
-            return Err(PreprocessorError(IncludeNotFound(
-                include.clone().to_string_lossy().to_string(),
-            )))
-            .with_context(|| format!("Invalid include {:?}", include));
-        }
-        let include_path = include_path
-            .canonicalize()
-            .with_context(|| format!("Failed to canonicalize include path {:?}", include))?;
-        *include = include_path;
-    }
-
-    for include in &include_paths {
-        let include_path = base_path.join(&include);
-        if !include_path.exists() {
-            return Err(PreprocessorError(IncludeNotFound(
-                include.clone().to_string_lossy().to_string(),
-            )))
-            .with_context(|| format!("Invalid include {:?}", include));
-        }
-        let include_path = include_path
-            .canonicalize()
-            .with_context(|| format!("Failed to canonicalize include path {:?}", include))?;
-        let include_file = std::fs::read_to_string(include_path.clone())
-            .with_context(|| format!("Failed to read include file {:?}", include_path))?;
-        let name = include_path
-            .clone()
-            .with_extension("")
-            .file_name()
-            .ok_or(PreprocessorError(
-                crate::error::PreprocessorError::InvalidFilename(
+        let Ok(include_file) = std::fs::read_to_string(include_path.clone()) else {
+            err!(
+                program,
+                PreprocessorError(IncludeNotFound(
+                    include.clone().to_string_lossy().to_string(),
+                )),
+                format!("Failed to read include file {:?}", include),
+                *include_ip
+            );
+        };
+        let name = include_path.clone().with_extension("");
+        let Some(name) = name.file_name() else {
+            err!(
+                program,
+                PreprocessorError(InvalidFilename(
                     include_path.clone().to_string_lossy().to_string(),
-                ),
-            ))?
-            .to_string_lossy()
-            .to_string();
+                )),
+                format!("Invalid filename for include {:?}", include),
+                *include_ip
+            )
+        };
+        let name = name.to_string_lossy().to_string();
         let mut include_program = crate::parser::parse(include_file, &name, include_path.clone())?;
         here(&mut include_program)?;
         includes(&mut include_program, depth + 1)?;
@@ -174,13 +203,6 @@ fn collect_macros(program: &mut Program) -> Result<()> {
             }
             InstructionKind::Keyword(Keyword::End { .. }) => {
                 let (kind, start_ip) = macro_stack.pop().unwrap();
-                assert!(
-                    kind == "macro"
-                        || kind == "if"
-                        || kind == "else"
-                        || kind == "elif"
-                        || kind == "do"
-                );
                 match kind {
                     "macro" => {
                         if in_macro {
@@ -199,13 +221,14 @@ fn collect_macros(program: &mut Program) -> Result<()> {
                             macro_body.clear();
                             continue;
                         } else {
-                            panic!("Macro end without start");
+                            err!(
+                                program,
+                                PreprocessorError(UnexpectedMacroEnd),
+                                "Unexpected macro end",
+                                ip
+                            );
                         }
                     }
-                    "if" => {}
-                    "else" => {}
-                    "while" => {}
-                    "do" => {}
                     _ => {}
                 }
             }
@@ -222,8 +245,7 @@ fn collect_macros(program: &mut Program) -> Result<()> {
                 macro_stack.push(("while", ip));
             }
             InstructionKind::Keyword(Keyword::Do { .. }) => {
-                let t = macro_stack.pop().unwrap().0;
-                assert!(t == "while" || t == "if" || t == "elif", "Invalid do {}", t);
+                let _ = macro_stack.pop().unwrap().0;
                 macro_stack.push(("do", ip));
             }
             _ => {}
@@ -246,7 +268,7 @@ fn expand_macros(program: &mut Program) -> Result<bool> {
     for instruction in program.instructions.iter() {
         match &instruction.kind {
             InstructionKind::Keyword(Keyword::Macro) => {
-                macro_stack.push(("macro", 0));
+                macro_stack.push("macro");
                 in_macro = true;
                 continue;
             }
@@ -260,45 +282,26 @@ fn expand_macros(program: &mut Program) -> Result<bool> {
                 }
             }
             InstructionKind::Keyword(Keyword::While { .. }) => {
-                macro_stack.push(("while", 0));
+                macro_stack.push("while");
             }
             InstructionKind::Keyword(Keyword::Do { .. }) => {
-                let t = macro_stack.pop().unwrap().0;
-                assert!(t == "while" || t == "if" || t == "elif");
-                macro_stack.push(("do", 0));
+                let _ = macro_stack.pop().unwrap();
+                macro_stack.push("do");
             }
             InstructionKind::Keyword(Keyword::If { .. }) => {
-                macro_stack.push(("if", 0));
+                macro_stack.push("if");
             }
             InstructionKind::Keyword(Keyword::Elif { .. }) => {
-                let pred = macro_stack.pop().unwrap().0;
-                if pred != "do" {
-                    return Err(PreprocessorError(UnexpectedKeyword("elif".to_owned())))
-                        .with_context(|| format!("Else without if/do: found {}", pred));
-                }
-                macro_stack.push(("elif", 0));
+                let _ = macro_stack.pop().unwrap();
+                macro_stack.push("elif");
             }
             InstructionKind::Keyword(Keyword::Else { .. }) => {
-                let pred = macro_stack.pop().unwrap().0;
-                if pred != "do" {
-                    return Err(PreprocessorError(UnexpectedKeyword("else".to_owned())))
-                        .with_context(|| format!("Else without if/do: found {}", pred));
-                }
-                macro_stack.push(("else", 0));
+                let _ = macro_stack.pop().unwrap();
+                macro_stack.push("else");
             }
             InstructionKind::Keyword(Keyword::End { .. }) => {
-                let (kind, _) = macro_stack.pop().unwrap();
+                let kind = macro_stack.pop().unwrap();
 
-                if ["macro", "do", "else", "elif"]
-                    .iter()
-                    .find(|x| *x == &kind)
-                    .is_none()
-                {
-                    return Err(PreprocessorError(UnexpectedKeyword("end".to_owned())))
-                        .with_context(|| {
-                            format!("Unexpected keyword {} in macro expansion", kind)
-                        });
-                }
                 match kind {
                     "macro" => {
                         if in_macro {
@@ -342,24 +345,19 @@ fn jumps(program: &mut Program) -> Result<()> {
             }) => {
                 let (t, if_do_end_ip, _, last_ip, last_last_ip) = jump_stack.pop().unwrap();
                 *self_ip = ip;
-                assert!(t == "ifdo" || t == "elifdo");
                 match t {
                     "ifdo" | "elifdo" => {}
                     _ => {
-                        return Err(PreprocessorError(UnexpectedKeyword(format!(
-                            "elif following {}",
-                            match t {
-                                "whiledo" => "while ... do",
-                                t => t,
-                            }
-                        ))))
-                        .with_context(|| {
-                            format!(
-                                "Elif can only close if/do and elif/do blocks.\n\n{}\n\n{}\n",
-                                err_spread(&program.instructions, ip, last_last_ip),
-                                err_loc(&program.instructions[ip].loc)
-                            )
-                        });
+                        err!(
+                            program,
+                            PreprocessorError(UnexpectedKeyword(format!(
+                                "elif following {}",
+                                kw_str(t)
+                            ))),
+                            "Elif can only close if/do and elif/do blocks.",
+                            ip,
+                            last_last_ip
+                        );
                     }
                 }
                 *if_do_end_ip.unwrap() = *self_ip;
@@ -372,20 +370,16 @@ fn jumps(program: &mut Program) -> Result<()> {
                 match t {
                     "ifdo" | "elifdo" => {}
                     _ => {
-                        return Err(PreprocessorError(UnexpectedKeyword(format!(
-                            "else following {}",
-                            match t {
-                                "whiledo" => "while ... do",
-                                t => t,
-                            }
-                        ))))
-                        .with_context(|| {
-                            format!(
-                                "Else can only close if/do and elif/do blocks.\n\n{}\n\n{}\n",
-                                err_spread(&program.instructions, ip, last_last_ip),
-                                err_loc(&program.instructions[ip].loc)
-                            )
-                        })
+                        err!(
+                            program,
+                            PreprocessorError(UnexpectedKeyword(format!(
+                                "else following {}",
+                                kw_str(t)
+                            ))),
+                            "Else can only close if/do and elif/do blocks.",
+                            ip,
+                            last_last_ip
+                        );
                     }
                 }
                 *if_end_ip.unwrap() = *self_ip;
@@ -395,7 +389,7 @@ fn jumps(program: &mut Program) -> Result<()> {
                 self_ip,
                 while_ip: return_ip,
             }) => {
-                let (t, end_ip, while_ip, last_ip, _) = jump_stack.pop().unwrap();
+                let (t, end_ip, while_ip, _, last_last_ip) = jump_stack.pop().unwrap();
                 *self_ip = ip;
                 match t {
                     "else" => {
@@ -420,17 +414,13 @@ fn jumps(program: &mut Program) -> Result<()> {
                         elifs.clear();
                     }
                     _ => {
-                        return Err(PreprocessorError(UnexpectedKeyword(format!(
-                            "end following {}",
-                            t
-                        ))))
-                        .with_context(|| {
-                            format!(
-                                "End can only close if/do, elif/do, else and while/do blocks.\n\n{}\n\n{}\n",
-                                err_spread(&program.instructions, ip, Some(last_ip)),
-                                err_loc(&program.instructions[ip].loc)
-                            )
-                        })
+                        err!(
+                            program,
+                            PreprocessorError(UnexpectedKeyword(format!("end following {t}"))),
+                            "End can only close if/do, elif/do, else and while/do blocks.",
+                            ip,
+                            last_last_ip
+                        );
                     }
                 }
             }
@@ -450,7 +440,18 @@ fn jumps(program: &mut Program) -> Result<()> {
                     "while" => {
                         jump_stack.push(("whiledo", Some(end_ip), while_ip, ip, Some(last_ip)));
                     }
-                    _ => panic!(),
+                    t => {
+                        err!(
+                            program,
+                            PreprocessorError(UnexpectedKeyword(format!(
+                                "do following {}",
+                                kw_str(t)
+                            ))),
+                            "Do can only follow if, elif and while.",
+                            ip,
+                            Some(last_ip)
+                        );
+                    }
                 }
             }
             _ => {}

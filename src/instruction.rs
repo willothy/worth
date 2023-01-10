@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap, fmt::Display, path::PathBuf, rc::Rc};
+use std::{collections::HashMap, fmt::Display, path::PathBuf};
 
 use crate::{
     codegen::intrinsics::Intrinsic,

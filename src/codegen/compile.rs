@@ -6,7 +6,7 @@ use crate::{
     asm, asm_line,
     cli::{CompilerOptions, OutputType},
     codegen::builder::Builder,
-    comment,
+    comment, err,
     error::{
         BoolError, CompileError::*, Error::CompileError, Error::IOError, IOError::NoFileExtension,
     },
@@ -43,13 +43,9 @@ pub fn compile(program: &Program, opt: CompilerOptions) -> Result<PathBuf> {
         ("mov", "[args_ptr], rsp")
     );
 
-    let Program {
-        instructions: program,
-        name: program_name,
-        ..
-    } = program;
+    let program_name = program.name.clone();
 
-    for inst in program {
+    for (ip, inst) in program.instructions.iter().enumerate() {
         asm.tmp_here +=
             &(inst.loc.0.clone() + ":" + &inst.loc.1.to_string() + ":" + &inst.loc.2.to_string());
         match &inst.kind {
@@ -166,16 +162,28 @@ pub fn compile(program: &Program, opt: CompilerOptions) -> Result<PathBuf> {
             InstructionKind::Syscall(SyscallKind::Syscall5) => ops::syscall5(&mut asm),
             InstructionKind::Syscall(SyscallKind::Syscall6) => ops::syscall6(&mut asm),
             InstructionKind::Keyword(Keyword::Include) => {
-                return Err(CompileError(UnexpectedToken("include".into())))
-                    .with_context(|| "Include should be expanded before codegen")
+                err!(
+                    program,
+                    CompileError(UnexpectedToken("include".into())),
+                    "Include should be expanded before codegen",
+                    ip
+                )
             }
             InstructionKind::Keyword(Keyword::Macro) => {
-                return Err(CompileError(UnexpectedToken("macro".into())))
-                    .with_context(|| "Macro should be expanded before codegen")
+                err!(
+                    program,
+                    CompileError(UnexpectedToken("macro".into())),
+                    "Macro should be expanded before codegen",
+                    ip
+                )
             }
             InstructionKind::Name(name) => {
-                return Err(CompileError(UnexpectedToken("macro".into())))
-                    .with_context(|| format!("Name {} should be resolved before codegen", name))
+                err!(
+                    program,
+                    CompileError(UnexpectedToken(name.clone())),
+                    format!("Name {} should be resolved before codegen", name),
+                    ip
+                )
             }
         }
     }

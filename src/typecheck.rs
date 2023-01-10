@@ -285,8 +285,8 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                     match t {
                         Int => stack.push(Int),
                         Char => stack.push(Char),
-                        Ptr => panic!(),
                         Bool => stack.push(Bool),
+                        Ptr => unreachable!(),
                     }
                 }
                 Op::Shl => {

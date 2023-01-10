@@ -18,7 +18,7 @@ macro_rules! segment {
             "text" => crate::codegen::builder::SegmentKind::Text,
             "data" => crate::codegen::builder::SegmentKind::Data,
             "bss" => crate::codegen::builder::SegmentKind::Bss,
-            _ => panic!("Invalid segment"),
+            s => panic!("Invalid segment {}", s),
         });
     };
 }
