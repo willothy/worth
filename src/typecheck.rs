@@ -553,7 +553,7 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                             });
                         }
                         snapshots.push((stack.clone(), Keyword::Do { end_ip: 0 }));
-                    } else if let Keyword::If { .. } = op_type {
+                    } else if let Keyword::If { .. } | Keyword::Elif { .. } = op_type {
                         snapshots.push((stack.clone(), Keyword::Do { end_ip: 0 }));
                     } else {
                         return Err(TypecheckError(InvalidLoop)).with_context(|| {
@@ -566,9 +566,43 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                         });
                     }
                 }
-                Keyword::If { else_ip } => {
-                    //tc!(expect: (Bool, Int, Ptr, Char));
-                    snapshots.push((stack.clone(), Keyword::If { else_ip: *else_ip }));
+                Keyword::If => {
+                    snapshots.push((stack.clone(), Keyword::If));
+                }
+                Keyword::Elif {
+                    self_ip,
+                    end_ip: else_ip,
+                } => {
+                    let (expected_stack, op_type) = snapshots
+                        .pop()
+                        .ok_or(TypecheckError(InvalidElse))
+                        .with_context(|| {
+                            format!(
+                                "Invalid else: No stack snapshot available: \n\n{}\n\nat {}",
+                                err_loc(&program, ip),
+                                tok_loc(&inst.loc)
+                            )
+                        })?;
+                    if !matches!(op_type, Keyword::Do { .. }) {
+                        return Err(TypecheckError(InvalidElse)).with_context(|| {
+                            format!("Invalid else: Expected do, got {:?}\n", op_type)
+                        });
+                    }
+                    if stack != expected_stack {
+                        return Err(TypecheckError(InvalidElse)).with_context(|| {
+                            format!(
+                                "Expected types {:?}, got {:?}. An elseless if statement cannot modify the stack.\n\n{}\n\nat {}",
+                                expected_stack, stack, err_loc(&program, ip), tok_loc(&inst.loc)
+                            )
+                        });
+                    }
+                    snapshots.push((
+                        stack.clone(),
+                        Keyword::Elif {
+                            self_ip: *self_ip,
+                            end_ip: *else_ip,
+                        },
+                    ));
                 }
                 Keyword::Else { .. } => {
                     let (stack_snapshot, op_type) = snapshots

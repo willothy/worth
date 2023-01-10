@@ -321,8 +321,10 @@ pub fn parse_name<'a>(input: Span<'a>) -> IResult<Span<'a>, Token> {
 pub fn parse_keyword<'a>(input: Span<'a>) -> IResult<Span<'a>, Token> {
     let (input, keyword) = alt((
         tag("while"),
+        tag("else if"),
         tag("do"),
         tag("if"),
+        tag("elif"),
         tag("else"),
         tag("macro"),
         tag("end"),

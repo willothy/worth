@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Display, path::PathBuf};
+use std::{cell::RefCell, collections::HashMap, fmt::Display, path::PathBuf, rc::Rc};
 
 use crate::{
     codegen::intrinsics::Intrinsic,
@@ -140,8 +140,10 @@ pub enum Keyword {
     Do {
         end_ip: usize,
     },
-    If {
-        else_ip: usize,
+    If,
+    Elif {
+        self_ip: usize,
+        end_ip: usize,
     },
     Else {
         self_ip: usize,
@@ -163,7 +165,15 @@ impl Keyword {
                 do_ip: 0,
             }),
             "do" => Ok(Keyword::Do { end_ip: 0 }),
-            "if" => Ok(Keyword::If { else_ip: 0 }),
+            "if" => Ok(Keyword::If),
+            "elif" => Ok(Keyword::Elif {
+                self_ip: 0,
+                end_ip: 0,
+            }),
+            "else if" => Ok(Keyword::Elif {
+                self_ip: 0,
+                end_ip: 0,
+            }),
             "else" => Ok(Keyword::Else {
                 self_ip: 0,
                 end_ip: 0,
@@ -188,6 +198,7 @@ impl std::fmt::Display for Keyword {
             Keyword::Do { .. } => write!(f, "do"),
             Keyword::If { .. } => write!(f, "if"),
             Keyword::Else { .. } => write!(f, "else"),
+            Keyword::Elif { .. } => write!(f, "elif"),
             Keyword::End { .. } => write!(f, "end"),
             Keyword::Macro => write!(f, "macro"),
             Keyword::Include => write!(f, "include"),

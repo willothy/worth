@@ -101,6 +101,18 @@ pub fn compile(program: &Program, opt: CompilerOptions) -> Result<PathBuf> {
             InstructionKind::Keyword(Keyword::If { .. }) => {
                 comment!(asm, "-- if --");
             }
+            InstructionKind::Keyword(Keyword::Elif {
+                self_ip,
+                end_ip: else_ip,
+            }) => {
+                comment!(asm, "-- elif --");
+                asm!(
+                    asm,
+                    /// Jump to post-elif statement
+                    ("jmp", "addr_{}", else_ip)
+                );
+                label!(asm, "addr_{}", self_ip);
+            }
             InstructionKind::Keyword(Keyword::Else {
                 self_ip: else_ip,
                 end_ip,

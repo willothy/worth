@@ -6,11 +6,15 @@ use crate::instruction::{InstructionKind, Keyword};
 use crate::log::*;
 use anyhow::{Context, Result};
 
-fn sanitize(str: String) -> String {
-    str.replace(" ", "_")
-        .replace("\n", "\\n")
-        .replace("\r", "\\r")
-        .replace("\t", "\\t")
+fn unquote(str: String) -> String {
+    let mut output = str;
+    if output.starts_with("\"") {
+        output = output.chars().skip(1).collect();
+    }
+    if output.ends_with("\"") {
+        output = output.chars().take(output.len() - 1).collect();
+    }
+    output
 }
 
 pub fn dump(program: &crate::instruction::Program, opt: crate::cli::CfgOptions) -> Result<()> {
@@ -65,15 +69,31 @@ pub fn dump(program: &crate::instruction::Program, opt: crate::cli::CfgOptions) 
         let op = &program.instructions[ip];
         use Keyword::*;
         match &op.kind {
-            InstructionKind::Keyword(If) => {
+            InstructionKind::Keyword(If { .. }) => {
                 writeln!(graph, "\tNode{} [shape=record label=if];", ip)?;
-                writeln!(graph, "\tNode{} -> Node{}", ip, ip + 1)?;
+                writeln!(graph, "\tNode{} -> Node{};", ip, ip + 1)?;
+            }
+            InstructionKind::Keyword(While { .. }) => {
+                writeln!(graph, "\tNode{} [shape=record label=while];", ip)?;
+                writeln!(graph, "\tNode{} -> Node{};", ip, ip + 1)?;
+            }
+            InstructionKind::Keyword(Do { end_ip }) => {
+                writeln!(graph, "\tNode{} [shape=record label=do];", ip)?;
+                writeln!(graph, "\tNode{} -> Node{} [label=\"true\"];", ip, ip + 1)?;
+                writeln!(graph, "\tNode{} -> Node{} [label=\"false\"];", ip, end_ip)?;
+            }
+            InstructionKind::Keyword(End { while_ip, .. }) => {
+                writeln!(graph, "\tNode{} [shape=record label=end];", ip)?;
+                writeln!(graph, "\tNode{} -> Node{};", ip, ip + 1)?;
+                if let Some(while_ip) = while_ip {
+                    writeln!(graph, "\tNode{} -> Node{};", ip, while_ip)?;
+                }
             }
             _ => {
                 writeln!(
                     graph,
                     "\tNode{ip} [label=\"{}\"];",
-                    snailquote::escape(&op.kind.to_string())
+                    unquote(snailquote::escape(&op.kind.to_string()).to_string())
                 )?;
                 writeln!(graph, "\tNode{} -> Node{};", ip, ip + 1)?;
             }

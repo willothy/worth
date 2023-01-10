@@ -311,6 +311,12 @@ pub fn sim_instruction(inst: &Instruction, state: &mut SimulationState) -> Resul
             }
         }
         InstructionKind::Keyword(Keyword::If { .. }) => {}
+        InstructionKind::Keyword(Keyword::Elif {
+            end_ip: else_ip, ..
+        }) => {
+            *ip = *else_ip;
+            return Ok(());
+        }
         InstructionKind::Keyword(Keyword::Else { end_ip, .. }) => {
             *ip = *end_ip;
             return Ok(());
