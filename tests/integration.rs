@@ -5,8 +5,6 @@ use std::{
 
 use std::io::Write;
 
-use serial_test::serial;
-
 struct TestData {
     stdin: String,
     args: Vec<String>,
@@ -16,11 +14,11 @@ fn parse_in_file(file: &PathBuf) -> Option<TestData> {
     let Some(contents) = std::fs::read_to_string(file).ok() else {
         return None;
     };
-    let mut args: Vec<String> = snailquote::escape(contents.lines().nth(0).unwrap())
+    let args: Vec<String> = snailquote::escape(contents.lines().nth(0).unwrap())
         .split_whitespace()
         .map(|x| x.to_string())
         .collect();
-    let mut stdin: String = contents
+    let stdin: String = contents
         .lines()
         .skip(1)
         .map(|x| x.to_string())
@@ -67,7 +65,12 @@ fn runner(category: &str, name: &str) {
         .spawn()
         .expect("failed to execute process");
     if let Some(stdin) = &stdin {
-        handle.stdin.as_mut().unwrap().write_all(stdin.as_bytes());
+        handle
+            .stdin
+            .as_mut()
+            .unwrap()
+            .write_all(stdin.as_bytes())
+            .unwrap();
     }
     let output = handle
         .wait_with_output()
@@ -94,7 +97,12 @@ fn runner(category: &str, name: &str) {
         .spawn()
         .expect("failed to execute process");
     if let Some(stdin) = &stdin {
-        handle.stdin.as_mut().unwrap().write_all(stdin.as_bytes());
+        handle
+            .stdin
+            .as_mut()
+            .unwrap()
+            .write_all(stdin.as_bytes())
+            .unwrap();
     }
     let sim_output = handle
         .wait_with_output()

@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use thiserror::Error;
 
 use crate::instruction::Instruction;
@@ -136,64 +137,132 @@ pub enum RuntimeError {
     BufferOverflow,
 }
 
+pub struct FmtToken<'a> {
+    pub prefix: String,
+    pub value: String,
+    pub postfix: String,
+    pub loc: &'a (String, usize, usize),
+}
+
+pub fn fmt_program<'a>(program: &'a [Instruction]) -> Vec<FmtToken<'a>> {
+    let mut nest_level = 0;
+    let mut prev_caused_newline = true;
+    program
+        .iter()
+        .map(|inst| {
+            let mut prefix = String::new();
+            let mut postfix = String::from(" ");
+            let kind_str = inst.kind.to_string();
+            let kind_str = kind_str.as_str();
+
+            if prev_caused_newline && kind_str.trim() != "end" {
+                for _ in 0..nest_level + 1 {
+                    prefix.insert_str(0, "    ");
+                }
+            }
+
+            match kind_str {
+                "if" => prev_caused_newline = false,
+                "else" => {
+                    prefix += "\n";
+                    postfix += "\n";
+                    prev_caused_newline = true;
+                }
+                "elif" => prev_caused_newline = false,
+                "while" => prev_caused_newline = false,
+                "do" => {
+                    postfix += "\n";
+                    nest_level += 1;
+                    prev_caused_newline = true;
+                }
+                "end" => {
+                    prefix += "\n    ";
+                    postfix += "\n\n";
+                    if nest_level > 0 {
+                        nest_level -= 1;
+                    }
+                    prev_caused_newline = true;
+                }
+                _ => prev_caused_newline = false,
+            }
+            FmtToken {
+                prefix,
+                value: inst.kind.to_string(),
+                postfix,
+                loc: &inst.loc,
+            }
+        })
+        .collect::<Vec<_>>()
+}
+
+pub enum Highlight {
+    Warning,
+    Error,
+}
+
+pub fn highlight_program<'a>(
+    program: &mut Vec<FmtToken<'a>>,
+    highlights: HashMap<usize, Highlight>,
+) {
+    program.iter_mut().enumerate().for_each(|(ip, tok)| {
+        if let Some(highlight) = highlights.get(&ip) {
+            match highlight {
+                Highlight::Warning => {
+                    tok.value = format!("{}{}{}", "\x1b[33m", tok.value, "\x1b[0m");
+                }
+                Highlight::Error => {
+                    tok.value = format!("{}{}{}", "\x1b[91m\x1b[1m>>> ", tok.value, "\x1b[0m");
+                }
+            }
+        }
+    });
+}
+
+pub fn render_program<'a>(program: &Vec<FmtToken<'a>>, start_line: usize) -> String {
+    let mut prog = program
+        .iter()
+        .map(|t| format!("{}{}{}", t.prefix, t.value, t.postfix))
+        .collect::<Vec<_>>()
+        .join("")
+        .lines()
+        .enumerate()
+        .filter_map(|(idx, line)| {
+            let line_num = start_line + idx;
+
+            if idx == 0 && line.trim().is_empty() {
+                None
+            } else if idx == program.len() - 1 && line.trim().is_empty() {
+                None
+            } else {
+                Some(format!("{:>4} | {}\n", line_num, line))
+            }
+        })
+        .collect::<String>();
+    prog.insert_str(0, "\n\n");
+    prog
+}
+
 pub fn err_spread(program: &Vec<Instruction>, ip: usize, secondary: Option<usize>) -> String {
     let spread_len = if secondary.is_some() && ip > secondary.unwrap() {
         ip - secondary.unwrap() + 1
     } else {
         6
     };
+
     let start = if spread_len > ip { 0 } else { ip - spread_len };
     let end = (ip + spread_len).min(program.len());
     let spread = start..end;
-    let mut nest_level = 0;
-    let mut prev_was_newline = false;
-    let output = program[spread.clone()]
-        .iter()
-        .map(|i| {
-            let mut out = String::new();
-            let kind_str = i.kind.to_string();
-            let err_location = ip;
 
-            if kind_str == "else" || kind_str == "end" {
-                out += "\n";
-            }
+    let first_line = program[start].loc.1 - 1;
 
-            if prev_was_newline {
-                if i.ip == err_location && nest_level > 0 {
-                    for _ in 0..nest_level - 1 {
-                        out.insert_str(0, "    ");
-                    }
-                } else {
-                    for _ in 0..nest_level {
-                        out.insert_str(0, "    ");
-                    }
-                }
-            }
-
-            out += &if i.ip == err_location {
-                format!("\x1b[31;1m>>> {}\x1b[0m", i.kind.to_string())
-            } else if secondary.is_some() && i.ip == secondary.unwrap() {
-                format!("\x1b[33m{}\x1b[0m", i.kind.to_string())
-            } else {
-                i.kind.to_string()
-            };
-
-            if kind_str == "while" || kind_str == "if" {
-                nest_level += 1;
-            } else if kind_str == "end" && nest_level != 0 {
-                nest_level -= 1;
-            }
-            if kind_str == "do" || kind_str == "end" || kind_str == "else" {
-                prev_was_newline = true;
-                out.push('\n');
-            } else {
-                prev_was_newline = false;
-                out.push(' ');
-            }
-            out
-        })
-        .collect::<Vec<_>>();
-    output.join("")
+    let mut tokens = fmt_program(&program[spread]);
+    let mut highlights = HashMap::new();
+    highlights.insert(ip - start, Highlight::Error);
+    if let Some(secondary) = secondary {
+        highlights.insert(secondary - start, Highlight::Warning);
+    }
+    highlight_program(&mut tokens, highlights);
+    render_program(&tokens, first_line)
 }
 
 pub fn err_loc(loc: &(String, usize, usize)) -> String {
@@ -215,10 +284,10 @@ macro_rules! err {
         return Err($kind).with_context(|| {
             use crate::error::{err_loc, err_spread};
             format!(
-                "{}\n\n{}\n{}\n",
+                "[{}] {}\n{}\n",
+                err_loc(&$program.instructions[$ip].loc),
                 $msg,
-                err_spread(&$program.instructions, $ip, None),
-                err_loc(&$program.instructions[$ip].loc)
+                err_spread(&$program.instructions, $ip, None)
             )
         })
     };
@@ -226,10 +295,10 @@ macro_rules! err {
         return Err($kind).with_context(|| {
             use crate::error::{err_loc, err_spread};
             format!(
-                "{}\n\n{}\n{}\n",
+                "[{}] {}\n{}\n",
+                err_loc(&$program.instructions[$ip].loc),
                 $msg,
-                err_spread(&$program.instructions, $ip, $last_ip),
-                err_loc(&$program.instructions[$ip].loc)
+                err_spread(&$program.instructions, $ip, $last_ip)
             )
         })
     };
