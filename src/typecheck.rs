@@ -3,7 +3,7 @@ use std::fmt::Display;
 use anyhow::{Context, Result};
 
 use crate::codegen::intrinsics::Intrinsic;
-use crate::error::{Error::TypecheckError, TypecheckError::*};
+use crate::error::{err_loc, err_spread, Error::TypecheckError, TypecheckError::*};
 use crate::instruction::{InstructionKind, Keyword, Op, Program, SyscallKind, Value};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -23,29 +23,6 @@ impl Display for ValType {
             ValType::Bool => write!(f, "bool"),
         }
     }
-}
-
-fn err_loc(program: &Program, ip: usize) -> String {
-    let spread_len = 6;
-    let start = if spread_len > ip { 0 } else { ip - spread_len };
-    let end = (ip + spread_len).min(program.instructions.len());
-    let spread = start..end;
-    let output = program.instructions[spread.clone()]
-        .iter()
-        .enumerate()
-        .map(|(idx, i)| {
-            if idx == spread.len() / 2 {
-                format!("\x1b[31m>>> {}\x1b[0m", i.kind.to_string())
-            } else {
-                i.kind.to_string()
-            }
-        })
-        .collect::<Vec<_>>();
-    output.join(" ")
-}
-
-fn tok_loc(loc: &(String, usize, usize)) -> String {
-    format!("{}:{}:{}", loc.0, loc.1, loc.2)
 }
 
 pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
@@ -68,8 +45,8 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                             "Stack underflow at instruction {}: {}\n\n{}\n\nat {}",
                             ip,
                             inst.kind,
-                            err_loc(&program, ip),
-                            tok_loc(&inst.loc)
+                            err_spread(&program.instructions, ip, None),
+                            err_loc(&inst.loc)
                         )
                     })?
             };
@@ -85,8 +62,8 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                                 inst.kind,
                                 casey::lower!(stringify!($expect)),
                                 v,
-                                err_loc(&program, ip),
-                                tok_loc(&inst.loc)
+                                err_spread(&program.instructions, ip, None),
+                                err_loc(&inst.loc)
                             )
                         },
                     );
@@ -107,8 +84,8 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                                     inst.kind,
                                     casey::lower!(stringify!($($expect)or+)),
                                     v,
-                                    err_loc(&program, ip),
-                                    tok_loc(&inst.loc)
+                                    err_spread(&program.instructions, ip, None),
+                                    err_loc(&inst.loc)
                                 )
                             },
                         );
@@ -154,8 +131,8 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                             inst.kind,
                             $num,
                             stack.len(),
-                            err_loc(&program, ip),
-                            tok_loc(&inst.loc)
+                            err_spread(&program.instructions, ip, None),
+                            err_loc(&inst.loc)
                         )
                     });
                 }
@@ -199,7 +176,7 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                                 .with_context(|| {
                                     format!(
                                         "Invalid type for {}: Expected int or ptr, got {} and {}.\n\n{}\n\nat {}",
-                                        inst.kind, illegal_a, illegal_b, err_loc(&program, ip), tok_loc(&inst.loc)
+                                        inst.kind, illegal_a, illegal_b, err_spread(&program.instructions, ip, None), err_loc(&inst.loc)
                                     )
                                 });
                         }
@@ -219,7 +196,7 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                                 .with_context(|| {
                                     format!(
                                         "Invalid type for {}: Expected int or ptr, got {} and {}.\n\n{}\n\nat {}",
-                                        inst.kind, illegal_a, illegal_b, err_loc(&program, ip), tok_loc(&inst.loc)
+                                        inst.kind, illegal_a, illegal_b, err_spread(&program.instructions, ip, None), err_loc(&inst.loc)
                                     )
                                 });
                         }
@@ -251,7 +228,7 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                                 .with_context(|| {
                                     format!(
                                         "Invalid type for {}: Expected int or bool, got {} and {}.\n\n{}\n\nat {}",
-                                        inst.kind, illegal_a, illegal_b, err_loc(&program, ip), tok_loc(&inst.loc)
+                                        inst.kind, illegal_a, illegal_b, err_spread(&program.instructions, ip, None), err_loc(&inst.loc)
                                     )
                                 });
                         }
@@ -274,7 +251,7 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                                 .with_context(|| {
                                     format!(
                                         "Invalid type for {}: Expected int or bool, got {} and {}.\n\n{}\n\nat {}",
-                                        inst.kind, illegal_a, illegal_b, err_loc(&program, ip), tok_loc(&inst.loc)
+                                        inst.kind, illegal_a, illegal_b, err_spread(&program.instructions, ip, None), err_loc(&inst.loc)
                                     )
                                 });
                         }
@@ -297,7 +274,7 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                                 .with_context(|| {
                                     format!(
                                         "Invalid type for {}: Expected int or bool, got {} and {}.\n\n{}\n\nat {}",
-                                        inst.kind, illegal_a, illegal_b, err_loc(&program, ip), tok_loc(&inst.loc)
+                                        inst.kind, illegal_a, illegal_b, err_spread(&program.instructions, ip, None), err_loc(&inst.loc)
                                     )
                                 });
                         }
@@ -338,7 +315,7 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                                 .with_context(|| {
                                     format!(
                                         "Invalid type for {}: Expected int or ptr, got {} and {}.\n\n{}\n\nat {}",
-                                        inst.kind, illegal_a, illegal_b, err_loc(&program, ip), tok_loc(&inst.loc)
+                                        inst.kind, illegal_a, illegal_b, err_spread(&program.instructions, ip, None), err_loc(&inst.loc)
                                     )
                                 });
                         }
@@ -364,7 +341,7 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                                 .with_context(|| {
                                     format!(
                                         "Invalid type for {}: Expected int or ptr, got {} and {}.\n\n{}\n\nat {}",
-                                        inst.kind, illegal_a, illegal_b, err_loc(&program, ip), tok_loc(&inst.loc)
+                                        inst.kind, illegal_a, illegal_b, err_spread(&program.instructions, ip, None), err_loc(&inst.loc)
                                     )
                                 });
                         }
@@ -383,7 +360,7 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                                 .with_context(|| {
                                     format!(
                                         "Invalid type for {}: Expected int or ptr, got {} and {}.\n\n{}\n\nat {}",
-                                        inst.kind, illegal_a, illegal_b, err_loc(&program, ip), tok_loc(&inst.loc)
+                                        inst.kind, illegal_a, illegal_b, err_spread(&program.instructions, ip, None), err_loc(&inst.loc)
                                     )
                                 });
                         }
@@ -402,7 +379,7 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                                 .with_context(|| {
                                     format!(
                                         "Invalid type for {}: Expected int or ptr, got {} and {}.\n\n{}\n\nat {}",
-                                        inst.kind, illegal_a, illegal_b, err_loc(&program, ip), tok_loc(&inst.loc)
+                                        inst.kind, illegal_a, illegal_b, err_spread(&program.instructions, ip, None), err_loc(&inst.loc)
                                     )
                                 });
                         }
@@ -421,7 +398,7 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                                 .with_context(|| {
                                     format!(
                                         "Invalid type for {}: Expected int or ptr, got {} and {}.\n\n{}\n\nat {}",
-                                        inst.kind, illegal_a, illegal_b, err_loc(&program, ip), tok_loc(&inst.loc)
+                                        inst.kind, illegal_a, illegal_b, err_spread(&program.instructions, ip, None), err_loc(&inst.loc)
                                     )
                                 });
                         }
@@ -440,7 +417,7 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                                 .with_context(|| {
                                     format!(
                                         "Invalid type for {}: Expected int or ptr, got {} and {}.\n\n{}\n\nat {}",
-                                        inst.kind, illegal_a, illegal_b, err_loc(&program, ip), tok_loc(&inst.loc)
+                                        inst.kind, illegal_a, illegal_b, err_spread(&program.instructions, ip, None), err_loc(&inst.loc)
                                     )
                                 });
                         }
@@ -474,7 +451,7 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                                 .with_context(|| {
                                     format!(
                                         "Invalid type for {}: Expected (int | char | ptr) and (int | char), got {} and {}.\n\n{}\n\nat {}",
-                                        inst.kind, illegal_a, illegal_n, err_loc(&program, ip), tok_loc(&inst.loc)
+                                        inst.kind, illegal_a, illegal_n, err_spread(&program.instructions, ip, None), err_loc(&inst.loc)
                                     )
                                 });
                         }
@@ -548,7 +525,7 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                             return Err(TypecheckError(InvalidLoop)).with_context(|| {
                                 format!(
                                     "Expected types {:?}, got {:?}. A while loop cannot modify the stack.\n\n{}\n\nat {}",
-                                    stack_snapshot, stack, err_loc(&program, ip), tok_loc(&inst.loc)
+                                    stack_snapshot, stack, err_spread(&program.instructions, ip, None), err_loc(&inst.loc)
                                 )
                             });
                         }
@@ -560,8 +537,8 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                             format!(
                                 "Invalid do: Expected while, got {:?}\n\n{}\n\nat {}",
                                 op_type,
-                                err_loc(&program, ip),
-                                tok_loc(&inst.loc)
+                                err_spread(&program.instructions, ip, None),
+                                err_loc(&inst.loc)
                             )
                         });
                     }
@@ -579,8 +556,8 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                         .with_context(|| {
                             format!(
                                 "Invalid else: No stack snapshot available: \n\n{}\n\nat {}",
-                                err_loc(&program, ip),
-                                tok_loc(&inst.loc)
+                                err_spread(&program.instructions, ip, None),
+                                err_loc(&inst.loc)
                             )
                         })?;
                     if !matches!(op_type, Keyword::Do { .. }) {
@@ -592,7 +569,7 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                         return Err(TypecheckError(InvalidElse)).with_context(|| {
                             format!(
                                 "Expected types {:?}, got {:?}. An elseless if statement cannot modify the stack.\n\n{}\n\nat {}",
-                                expected_stack, stack, err_loc(&program, ip), tok_loc(&inst.loc)
+                                expected_stack, stack, err_spread(&program.instructions, ip, None), err_loc(&inst.loc)
                             )
                         });
                     }
@@ -611,8 +588,8 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                         .with_context(|| {
                             format!(
                                 "Invalid else: No stack snapshot available: \n\n{}\n\nat {}",
-                                err_loc(&program, ip),
-                                tok_loc(&inst.loc)
+                                err_spread(&program.instructions, ip, None),
+                                err_loc(&inst.loc)
                             )
                         })?;
                     if let Keyword::Do { .. } = op_type {
@@ -628,8 +605,8 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                             format!(
                                 "Invalid else: Expected if, got {:?}\n\n{}\n\nat {}",
                                 op_type,
-                                err_loc(&program, ip),
-                                tok_loc(&inst.loc)
+                                err_spread(&program.instructions, ip, None),
+                                err_loc(&inst.loc)
                             )
                         });
                     }
@@ -644,7 +621,7 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                             return Err(TypecheckError(InvalidEnd)).with_context(|| {
                                 format!(
                                     "Expected types {:?}, got {:?}. A while loop cannot modify the stack.\n\n{}\n\nat {}",
-                                    expected_stack, stack, err_loc(&program, ip), tok_loc(&inst.loc)
+                                    expected_stack, stack, err_spread(&program.instructions, ip, None), err_loc(&inst.loc)
                                 )
                             });
                         }
@@ -653,7 +630,7 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                             return Err(TypecheckError(InvalidEnd)).with_context(|| {
                                 format!(
                                     "Expected types {:?}, got {:?}. An elseless if statement cannot modify the stack.\n\n{}\n\nat {}",
-                                    expected_stack, stack, err_loc(&program, ip), tok_loc(&inst.loc)
+                                    expected_stack, stack, err_spread(&program.instructions, ip, None), err_loc(&inst.loc)
                                 )
                             });
                         }
@@ -662,7 +639,7 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                             return Err(TypecheckError(InvalidEnd)).with_context(|| {
                                 format!(
                                     "Expected types {:?}, got {:?}. Both branches of an if statement must push the same types to the stack\n\n{}\n\nat {}",
-                                    expected_stack, stack, err_loc(&program, ip), tok_loc(&inst.loc)
+                                    expected_stack, stack, err_spread(&program.instructions, ip, None), err_loc(&inst.loc)
                                 )
                             });
                         }
@@ -675,8 +652,8 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                         format!(
                             "Unexpected macro in code at instruction {}\n\n{}\n\nat {}",
                             ip,
-                            err_loc(&program, ip),
-                            tok_loc(&inst.loc)
+                            err_spread(&program.instructions, ip, None),
+                            err_loc(&inst.loc)
                         )
                     })
                 }
@@ -685,8 +662,8 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                         format!(
                             "Unexpected include in code at instruction {}\n\n{}\n\nat {}",
                             ip,
-                            err_loc(&program, ip),
-                            tok_loc(&inst.loc)
+                            err_spread(&program.instructions, ip, None),
+                            err_loc(&inst.loc)
                         )
                     })
                 }
@@ -707,12 +684,12 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
             unim => todo!(
                 "Implement typechecking for instruction {} at {}",
                 unim,
-                tok_loc(&inst.loc)
+                err_loc(&inst.loc)
             ),
         };
         if debugger {
             println!("{}: {:?}", ip, inst);
-            println!("Location: {}", tok_loc(&inst.loc));
+            println!("Location: {}", err_loc(&inst.loc));
             println!("Stack: {:?}", stack);
             println!("Snapshots: {}\n", snapshots.len());
             std::io::stdin().read_line(&mut String::new()).unwrap();

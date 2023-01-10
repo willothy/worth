@@ -235,6 +235,7 @@ impl std::fmt::Display for SyscallKind {
 pub struct Instruction {
     pub kind: InstructionKind,
     pub loc: (String, usize, usize),
+    pub ip: usize,
 }
 
 #[derive(Debug, Clone)]

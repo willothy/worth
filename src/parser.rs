@@ -80,6 +80,7 @@ pub fn parse(source: String, name: &str, path: PathBuf) -> Result<Program> {
                 let inst = Instruction {
                     kind: ty,
                     loc: t.location.clone(),
+                    ip: 0,
                 };
                 Ok(inst)
             })
