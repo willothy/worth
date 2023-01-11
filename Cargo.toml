@@ -10,6 +10,10 @@ publish = false
 name = "worthc"
 path = "src/main.rs"
 
+[[bin]]
+name = "worth-fmt"
+path = "src/fmt.rs"
+
 [dependencies]
 anyhow = "1.0.68"
 casey = "0.3.3"
@@ -19,6 +23,7 @@ nom = "7.1.2"
 nom_locate = "4.0.0"
 snailquote = "0.3.1"
 thiserror = "1.0.38"
+walkdir = "2.3.2"
 
 [dev-dependencies]
 serial_test = "0.10.0"

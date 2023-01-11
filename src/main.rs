@@ -1,9 +1,6 @@
-use std::path::PathBuf;
-
 use clap::Parser;
 
 use cli::{Cli, Command};
-use instruction::Program;
 
 mod cfg;
 mod cli;
@@ -13,33 +10,14 @@ mod instruction;
 mod log;
 mod parser;
 mod preprocessor;
+mod program;
 mod runner;
 mod sim;
 mod typecheck;
 
 use anyhow::{Context, Result};
-use error::Error::IOError;
-use error::IOError::*;
 
-fn load_program(path: &PathBuf) -> Result<Program> {
-    let path = path
-        .canonicalize()
-        .with_context(|| format!("Failed to canonicalize path {:?}", path))?;
-    let name = path.clone().with_extension("");
-    let name = name
-        .file_name()
-        .ok_or(IOError(InvalidFilename))
-        .with_context(|| format!("Path {:?} does not have a filename", path))?
-        .to_str()
-        .ok_or(IOError(InvalidFilename))
-        .with_context(|| format!("Path {:?} does not have a valid filename", path))?;
-
-    let source = std::fs::read_to_string(&path).map_err(|e| IOError(Inherited(e)))?;
-
-    let program = parser::parse(source, name, path.clone())?;
-    let program = preprocessor::process(program)?;
-    Ok(program)
-}
+use self::program::load_program;
 
 fn main() -> Result<()> {
     let args = Cli::parse();

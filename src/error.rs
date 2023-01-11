@@ -144,50 +144,110 @@ pub struct FmtToken<'a> {
     pub loc: &'a (String, usize, usize),
 }
 
+pub trait RenderFmt {
+    fn render(&self, start_line: usize, line_numbers: bool, trim_empty: bool) -> String;
+}
+
+impl<'a> RenderFmt for Vec<FmtToken<'a>> {
+    fn render(&self, start_line: usize, line_numbers: bool, trim_empty: bool) -> String {
+        let mut prog = self
+            .iter()
+            .map(|t| format!("{}{}{}", t.prefix, t.value, t.postfix))
+            .collect::<Vec<_>>()
+            .join("")
+            .lines()
+            .enumerate()
+            .filter_map(|(idx, line)| {
+                let line_num = start_line + idx;
+
+                if idx == 0 && line.trim().is_empty() && trim_empty {
+                    None
+                } else if idx == self.len() - 1 && line.trim().is_empty() && trim_empty {
+                    None
+                } else if line_numbers {
+                    Some(format!("{:>4} | {}\n", line_num, line.trim_end()))
+                } else {
+                    Some(format!("{}\n", line.trim_end()))
+                }
+            })
+            .collect::<String>();
+        prog.insert_str(0, "\n\n");
+        prog
+    }
+}
+
 pub fn fmt_program<'a>(program: &'a [Instruction]) -> Vec<FmtToken<'a>> {
     let mut nest_level = 0;
-    let mut prev_caused_newline = true;
+    let mut prev_caused_newline = false;
+    let mut last_was_include = false;
+    let mut line_len = 0;
     program
         .iter()
-        .map(|inst| {
+        .enumerate()
+        .map(|(idx, inst)| {
             let mut prefix = String::new();
             let mut postfix = String::from(" ");
-            let kind_str = inst.kind.to_string();
+            let kind_str = match &inst.kind {
+                crate::instruction::InstructionKind::Push(v) => match v {
+                    crate::instruction::Value::Str(s) => format!("\"{}\"", s),
+                    v => v.to_string(),
+                },
+                k => k.to_string(),
+            };
             let kind_str = kind_str.as_str();
 
             if prev_caused_newline && kind_str.trim() != "end" {
-                for _ in 0..nest_level + 1 {
+                for _ in 0..nest_level {
                     prefix.insert_str(0, "    ");
                 }
             }
 
             match kind_str {
-                "if" => prev_caused_newline = false,
+                "if" => {
+                    prev_caused_newline = false;
+                    nest_level += 1;
+                }
                 "else" => {
-                    prefix += "\n";
-                    postfix += "\n";
                     prev_caused_newline = true;
                 }
-                "elif" => prev_caused_newline = false,
-                "while" => prev_caused_newline = false,
-                "do" => {
-                    postfix += "\n";
+                "elif" => {
+                    prefix.insert_str(0, "\n");
+                    prev_caused_newline = false;
+                }
+                "while" => {
+                    prefix.insert_str(0, "\n");
+                    prev_caused_newline = false;
                     nest_level += 1;
+                }
+                "do" => {
+                    postfix = "\n".to_owned();
                     prev_caused_newline = true;
                 }
                 "end" => {
-                    prefix += "\n    ";
-                    postfix += "\n\n";
+                    prefix.insert_str(0, "\n");
+                    postfix = "\n\n".to_owned();
                     if nest_level > 0 {
                         nest_level -= 1;
                     }
                     prev_caused_newline = true;
                 }
-                _ => prev_caused_newline = false,
+                _ => {
+                    prev_caused_newline = false;
+                }
             }
+
+            if !prev_caused_newline {
+                line_len += prefix.len() + kind_str.len();
+                if line_len > 30 {
+                    postfix = postfix.replacen(" ", "\n", 1);
+                    line_len = 0;
+                    prev_caused_newline = true;
+                }
+            }
+
             FmtToken {
                 prefix,
-                value: inst.kind.to_string(),
+                value: kind_str.to_owned(),
                 postfix,
                 loc: &inst.loc,
             }
@@ -218,30 +278,6 @@ pub fn highlight_program<'a>(
     });
 }
 
-pub fn render_program<'a>(program: &Vec<FmtToken<'a>>, start_line: usize) -> String {
-    let mut prog = program
-        .iter()
-        .map(|t| format!("{}{}{}", t.prefix, t.value, t.postfix))
-        .collect::<Vec<_>>()
-        .join("")
-        .lines()
-        .enumerate()
-        .filter_map(|(idx, line)| {
-            let line_num = start_line + idx;
-
-            if idx == 0 && line.trim().is_empty() {
-                None
-            } else if idx == program.len() - 1 && line.trim().is_empty() {
-                None
-            } else {
-                Some(format!("{:>4} | {}\n", line_num, line))
-            }
-        })
-        .collect::<String>();
-    prog.insert_str(0, "\n\n");
-    prog
-}
-
 pub fn err_spread(program: &Vec<Instruction>, ip: usize, secondary: Option<usize>) -> String {
     let spread_len = if secondary.is_some() && ip > secondary.unwrap() {
         ip - secondary.unwrap() + 1
@@ -262,7 +298,7 @@ pub fn err_spread(program: &Vec<Instruction>, ip: usize, secondary: Option<usize
         highlights.insert(secondary - start, Highlight::Warning);
     }
     highlight_program(&mut tokens, highlights);
-    render_program(&tokens, first_line)
+    tokens.render(first_line, true, true)
 }
 
 pub fn err_loc(loc: &(String, usize, usize)) -> String {
