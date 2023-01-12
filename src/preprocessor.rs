@@ -457,5 +457,17 @@ fn jumps(program: &mut Program) -> Result<()> {
             _ => {}
         }
     }
+
+    if jump_stack.len() > 0 {
+        let (t, _, _, ip, last_ip) = jump_stack.pop().unwrap();
+        err!(
+            program,
+            PreprocessorError(UnclosedBlock(format!("{}", kw_str(t)))),
+            format!("Missing end for {} block.", kw_str(t)),
+            ip,
+            last_ip
+        );
+    }
+
     Ok(())
 }

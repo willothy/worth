@@ -17,7 +17,7 @@ use nom::{
     combinator::{eof, opt},
     multi::{many0, many1},
     sequence::{delimited, preceded, tuple},
-    IResult,
+    FindSubstring, FindToken, IResult,
 };
 use nom_locate::LocatedSpan;
 
@@ -55,6 +55,10 @@ pub fn parse(source: String, name: &str, path: PathBuf) -> Result<Program> {
             .to_path_buf(),
         instructions: tokens
             .iter()
+            .filter(|t| match t.ty {
+                TokenType::Comment => false,
+                _ => true,
+            })
             .map(|t| {
                 let ty = match &t.ty {
                     TokenType::Intrinsic(i) => InstructionKind::Intrinsic(i.clone()),
@@ -115,27 +119,24 @@ pub fn parse_program<'a>(input: Span<'a>) -> Result<Vec<Token>> {
             .with_context(|| format!("Remaining input: {}", input.fragment()));
     }
 
-    tokens = tokens
-        .iter()
-        .filter(|t| match t.ty {
-            TokenType::Comment => false,
-            _ => true,
-        })
-        .cloned()
-        .collect();
     Ok(tokens)
 }
 
-pub fn parse_syscalls<'a>(input: Span<'a>) -> IResult<Span<'a>, Token> {
-    let (input, syscall) = preceded(tag("syscall"), digit1)(input)?;
+pub fn parse_syscalls<'a>(base_input: Span<'a>) -> IResult<Span<'a>, Token> {
+    let (input, syscall) = preceded(tag("syscall"), digit1)(base_input)?;
+
+    let loc = (
+        base_input.extra.to_string(),
+        base_input.location_line() as usize,
+        base_input
+            .get_line_beginning()
+            .find_substring(syscall.fragment().as_bytes())
+            .unwrap(),
+    );
 
     let token = Token {
         value: "syscall".to_owned() + syscall.fragment(),
-        location: (
-            input.extra.to_string(),
-            input.location_line() as usize,
-            input.get_column(),
-        ),
+        location: loc,
         ty: TokenType::Syscall(syscall.fragment().parse::<usize>().unwrap()),
     };
     Ok((input, token))
@@ -153,48 +154,83 @@ pub fn parse_value<'a>(input: Span<'a>) -> IResult<Span<'a>, Token> {
     Ok((input, token))
 }
 
-pub fn parse_bool<'a>(input: Span<'a>) -> IResult<Span<'a>, Token> {
-    let (input, value) = alt((tag("true"), tag("false")))(input)?;
-    let value = value.fragment().parse::<bool>().unwrap();
+pub fn parse_bool<'a>(base_input: Span<'a>) -> IResult<Span<'a>, Token> {
+    let (input, value) = alt((tag("true"), tag("false")))(base_input)?;
+    let bool_value = value.fragment().parse::<bool>().unwrap();
+
+    let loc = (
+        base_input.extra.to_string(),
+        base_input.location_line() as usize,
+        base_input
+            .get_line_beginning()
+            .find_substring(value.fragment().as_bytes())
+            .unwrap(),
+    );
 
     let token = Token {
-        value: value.to_string(),
-        location: (
-            input.extra.to_string(),
-            input.location_line() as usize,
-            input.get_column(),
-        ),
-        ty: TokenType::Value(Value::Bool(value)),
+        value: bool_value.to_string(),
+        location: loc,
+        ty: TokenType::Value(Value::Bool(bool_value)),
     };
     Ok((input, token))
 }
 
-pub fn parse_string<'a>(input: Span<'a>) -> IResult<Span<'a>, Token> {
+pub fn parse_string<'a>(base_input: Span<'a>) -> IResult<Span<'a>, Token> {
     let (input, value) = delimited(
         char('"'),
         many0(alt((special_char, satisfy(|c| c != '"')))),
         char('"'),
-    )(input)?;
+    )(base_input)?;
     let value = value.into_iter().collect::<String>();
+
+    let loc = (
+        base_input.extra.to_string(),
+        base_input.location_line() as usize,
+        base_input
+            .get_line_beginning()
+            .find_substring(value.as_bytes())
+            .unwrap(),
+    );
 
     let token = Token {
         value: value.to_string(),
-        location: (
-            input.extra.to_string(),
-            input.location_line() as usize,
-            input.get_column(),
-        ),
+        location: loc,
         ty: TokenType::Value(Value::Str(value.to_string())),
     };
     Ok((input, token))
 }
 
-pub fn parse_char<'a>(input: Span<'a>) -> IResult<Span<'a>, Token> {
+pub fn parse_char<'a>(base_input: Span<'a>) -> IResult<Span<'a>, Token> {
     let (input, value) = delimited(
         char('\''),
         alt((special_char, satisfy(|c| c != '\'' && c != '\\'))),
         char('\''),
-    )(input)?;
+    )(base_input)?;
+    let val_str = value.to_string();
+
+    let loc = (
+        base_input.extra.to_string(),
+        base_input.location_line() as usize,
+        base_input
+            .get_line_beginning()
+            .find_substring(
+                format!(
+                    "'{}'",
+                    match value {
+                        '\n' => "\\n",
+                        '\t' => "\\t",
+                        '\r' => "\\r",
+                        '\\' => "\\\\",
+                        '\'' => "\\'",
+                        '\"' => "\\\"",
+                        '\0' => "\\0",
+                        _ => val_str.as_str(),
+                    }
+                )
+                .as_bytes(),
+            )
+            .unwrap(),
+    );
 
     if !value.is_ascii() {
         return Err(nom::Err::Error(nom::error::Error::new(
@@ -205,11 +241,7 @@ pub fn parse_char<'a>(input: Span<'a>) -> IResult<Span<'a>, Token> {
 
     let token = Token {
         value: value.to_string(),
-        location: (
-            input.extra.to_string(),
-            input.location_line() as usize,
-            input.get_column(),
-        ),
+        location: loc,
         ty: TokenType::Value(Value::Char(value as u8)),
     };
     Ok((input, token))
@@ -237,44 +269,62 @@ pub fn special_char<'a>(input: Span<'a>) -> IResult<Span<'a>, char> {
     }
 }
 
-pub fn parse_int<'a>(input: Span<'a>) -> IResult<Span<'a>, Token> {
-    let (input, (negative, value)) = tuple((opt(char('-')), digit1))(input)?;
+pub fn parse_int<'a>(base_input: Span<'a>) -> IResult<Span<'a>, Token> {
+    let (input, (negative, value)) = tuple((opt(char('-')), digit1))(base_input)?;
 
     let mut fragment = value.fragment().to_string();
+
     if negative.is_some() {
         fragment.insert(0, '-');
     }
+
+    let loc = (
+        base_input.extra.to_string(),
+        base_input.location_line() as usize,
+        base_input
+            .get_line_beginning()
+            .find_substring(fragment.as_bytes())
+            .unwrap(),
+    );
+
     let token = Token {
         value: fragment.clone(),
-        location: (
-            input.extra.to_string(),
-            input.location_line() as usize,
-            input.get_column(),
-        ),
+        location: loc,
         ty: TokenType::Value(Value::Int(fragment.parse::<i64>().unwrap())),
     };
     Ok((input, token))
 }
 
-pub fn parse_hex_int<'a>(input: Span<'a>) -> IResult<Span<'a>, Token> {
-    let (input, value) = preceded(alt((tag("0x"), tag("0X"))), hex_digit1)(input)?;
-
+pub fn parse_hex_int<'a>(base_input: Span<'a>) -> IResult<Span<'a>, Token> {
+    let (input, value) = preceded(alt((tag("0x"), tag("0X"))), hex_digit1)(base_input)?;
+    let loc = (
+        base_input.extra.to_string(),
+        base_input.location_line() as usize,
+        base_input
+            .get_line_beginning()
+            .find_substring(value.fragment().as_bytes())
+            .unwrap(),
+    );
     let value_num = i64::from_str_radix(value.fragment(), 16).unwrap();
     let token = Token {
         value: value_num.to_string(),
-        location: (
-            input.extra.to_string(),
-            input.location_line() as usize,
-            input.get_column(),
-        ),
+        location: loc,
         ty: TokenType::Value(Value::Int(value_num)),
     };
 
     Ok((input, token))
 }
 
-pub fn parse_intrinsic<'a>(input: Span<'a>) -> IResult<Span<'a>, Token> {
-    let (input, instruction) = many1(satisfy(|c: char| !c.is_whitespace()))(input)?;
+pub fn parse_intrinsic<'a>(base_input: Span<'a>) -> IResult<Span<'a>, Token> {
+    let (input, instruction) = many1(satisfy(|c: char| !c.is_whitespace()))(base_input)?;
+    let loc = (
+        base_input.extra.to_string(),
+        base_input.location_line() as usize,
+        base_input
+            .get_line_beginning()
+            .find_substring(instruction.iter().collect::<String>().as_bytes())
+            .unwrap(),
+    );
     let fragment: String = instruction.iter().collect();
     let intrinsic = match crate::codegen::intrinsics::Intrinsic::from_str(&fragment) {
         Ok(i) => i,
@@ -287,39 +337,32 @@ pub fn parse_intrinsic<'a>(input: Span<'a>) -> IResult<Span<'a>, Token> {
     };
     let token = Token {
         value: fragment,
-        location: (
-            input.extra.to_string(),
-            input.location_line() as usize,
-            input.get_column(),
-        ),
+        location: loc,
         ty: TokenType::Intrinsic(intrinsic),
     };
     Ok((input, token))
 }
 
-pub fn parse_name<'a>(input: Span<'a>) -> IResult<Span<'a>, Token> {
-    let extra = input.extra.to_owned();
-    let line = input.location_line();
-    let col = input.get_column();
-    /* let (input, (start, name_rest)) = tuple((
-        alt((satisfy(|c| c.is_alphabetic()), char('_'))),
-        opt(many1(alt((satisfy(|c| c.is_alphanumeric()), char('_'))))),
-    ))(input)?;
-    let mut name = vec![start];
-    if let Some(rest) = name_rest {
-        name.extend(rest);
-    } */
+pub fn parse_name<'a>(base_input: Span<'a>) -> IResult<Span<'a>, Token> {
     // match any non whitespace character
-    let (input, name) = many1(satisfy(|c| !c.is_whitespace()))(input)?;
+    let (input, name) = many1(satisfy(|c| !c.is_whitespace()))(base_input)?;
+    let loc = (
+        base_input.extra.to_string(),
+        base_input.location_line() as usize,
+        base_input
+            .get_line_beginning()
+            .find_substring(name.iter().collect::<String>().as_bytes())
+            .unwrap(),
+    );
     let token = Token {
         value: name.iter().collect(),
-        location: (extra, line as usize, col - 1),
+        location: loc,
         ty: TokenType::Name,
     };
     Ok((input, token))
 }
 
-pub fn parse_keyword<'a>(input: Span<'a>) -> IResult<Span<'a>, Token> {
+pub fn parse_keyword<'a>(base_input: Span<'a>) -> IResult<Span<'a>, Token> {
     let (input, keyword) = alt((
         tag("while"),
         tag("else if"),
@@ -330,16 +373,20 @@ pub fn parse_keyword<'a>(input: Span<'a>) -> IResult<Span<'a>, Token> {
         tag("macro"),
         tag("end"),
         tag("include"),
-    ))(input)?;
+    ))(base_input)?;
+    let loc = (
+        base_input.extra.to_string(),
+        base_input.location_line() as usize,
+        base_input
+            .get_line_beginning()
+            .find_substring(keyword.fragment().as_bytes())
+            .unwrap(),
+    );
     Ok((
         input,
         Token {
             value: keyword.fragment().to_string(),
-            location: (
-                input.extra.to_string(),
-                input.location_line() as usize,
-                input.get_column(),
-            ),
+            location: loc,
             ty: TokenType::Keyword,
         },
     ))
@@ -391,35 +438,43 @@ fn ops2<'a>(input: Span<'a>) -> IResult<Span<'a>, Span<'a>> {
     Ok((input, instruction))
 }
 
-pub fn parse_op<'a>(input: Span<'a>) -> IResult<Span<'a>, Token> {
-    let (input, instruction) = alt((ops1, ops2))(input)?;
+pub fn parse_op<'a>(base_input: Span<'a>) -> IResult<Span<'a>, Token> {
+    let (input, op) = alt((ops1, ops2))(base_input)?;
+    let loc = (
+        base_input.extra.to_string(),
+        base_input.location_line() as usize,
+        base_input
+            .get_line_beginning()
+            .find_substring(op.fragment().as_bytes())
+            .unwrap(),
+    );
     Ok((
         input,
         Token {
-            value: instruction.fragment().to_string(),
-            location: (
-                input.extra.to_string(),
-                input.location_line() as usize,
-                input.get_column(),
-            ),
+            value: op.fragment().to_string(),
+            location: loc,
             ty: TokenType::Op,
         },
     ))
 }
 
-pub fn parse_comment<'a>(input: Span<'a>) -> IResult<Span<'a>, Token> {
-    let (input, _) = nom::bytes::complete::tag("//")(input)?;
-    let (input, _) = multispace0(input)?;
-    let (input, _) = nom::bytes::complete::take_while(|c: char| c != '\n')(input)?;
+pub fn parse_comment<'a>(base_input: Span<'a>) -> IResult<Span<'a>, Token> {
+    let (input, _) = nom::bytes::complete::tag("//")(base_input)?;
+    let (input, spaces) = multispace0(input)?;
+    let (input, comment) = nom::bytes::complete::take_while(|c: char| c != '\n')(input)?;
+    let loc = (
+        base_input.extra.to_string(),
+        base_input.location_line() as usize,
+        base_input
+            .get_line_beginning()
+            .find_substring(("//".to_owned() + spaces.fragment() + comment.fragment()).as_bytes())
+            .unwrap(),
+    );
     Ok((
         input,
         Token {
             value: "".to_string(),
-            location: (
-                input.extra.to_string(),
-                input.location_line() as usize,
-                input.get_column(),
-            ),
+            location: loc,
             ty: TokenType::Comment,
         },
     ))

@@ -1,7 +1,10 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, mem::ManuallyDrop};
 use thiserror::Error;
 
-use crate::instruction::Instruction;
+use crate::{
+    instruction::{Instruction, InstructionKind, Value},
+    parser::{Token, TokenType},
+};
 
 pub trait BoolError {
     fn to_err(self) -> anyhow::Result<(), ()>;
@@ -117,6 +120,8 @@ pub enum PreprocessorError {
     UnexpectedKeyword(String),
     #[error("Unexpected macro end")]
     UnexpectedMacroEnd,
+    #[error("Unclosed {0} block")]
+    UnclosedBlock(String),
 }
 
 #[derive(Error, Debug)]
@@ -139,120 +144,287 @@ pub enum RuntimeError {
 
 pub struct FmtToken<'a> {
     pub prefix: String,
+    pub color: String,
     pub value: String,
+    pub postcolor: String,
     pub postfix: String,
     pub loc: &'a (String, usize, usize),
+    pub kind: FmtTokenKind,
+    pub indent_level: usize,
+}
+
+pub enum FmtTokenKind {
+    Token(TokenType),
+    Instruction(InstructionKind),
 }
 
 pub trait RenderFmt {
-    fn render(&self, start_line: usize, line_numbers: bool, trim_empty: bool) -> String;
+    fn render(&self, start_line: usize, line_numbers: bool, err: bool) -> String;
+    fn format(&mut self) -> &mut Self;
 }
 
 impl<'a> RenderFmt for Vec<FmtToken<'a>> {
-    fn render(&self, start_line: usize, line_numbers: bool, trim_empty: bool) -> String {
-        let mut prog = self
-            .iter()
-            .map(|t| format!("{}{}{}", t.prefix, t.value, t.postfix))
-            .collect::<Vec<_>>()
-            .join("")
-            .lines()
-            .enumerate()
-            .filter_map(|(idx, line)| {
-                let line_num = start_line + idx;
+    fn render(&self, start_line: usize, line_numbers: bool, err: bool) -> String {
+        let mut curr_line_no = 0;
+        let mut lines = Vec::new();
+        let mut line = String::new();
 
-                if idx == 0 && line.trim().is_empty() && trim_empty {
-                    None
-                } else if idx == self.len() - 1 && line.trim().is_empty() && trim_empty {
-                    None
-                } else if line_numbers {
-                    Some(format!("{:>4} | {}\n", line_num, line.trim_end()))
+        for inst in self {
+            if inst.loc.1 != curr_line_no {
+                lines.push(line.trim_end_matches(' ').to_owned());
+                line = String::new();
+                if if inst.loc.1.to_string().len() >= curr_line_no {
+                    inst.loc.1.to_string().len() - curr_line_no
                 } else {
-                    Some(format!("{}\n", line.trim_end()))
+                    0
+                } > 1
+                    && lines.len() > 0
+                    && line_numbers
+                {
+                    let len = {
+                        if inst.loc.1.to_string().len() > 0 {
+                            inst.loc.1.to_string().len() - 1
+                        } else {
+                            0
+                        }
+                    };
+                    lines.push(format!("{:.>len$}↓| ...", ""))
                 }
-            })
-            .collect::<String>();
-        prog.insert_str(0, "\n\n");
-        prog
+                curr_line_no = inst.loc.1;
+            }
+            if line.is_empty() {
+                if line_numbers {
+                    let len = curr_line_no.to_string().len();
+                    line += &format!("{:.<len$}| ", curr_line_no);
+                }
+            }
+            if err {
+                line.push_str(&inst.prefix.replace("\n", ""));
+            } else {
+                line.push_str(&inst.prefix.replacen("\n", "", 1));
+            }
+            if line.trim_matches('\n').len() == 0
+                && !matches!(
+                    inst.kind,
+                    FmtTokenKind::Instruction(InstructionKind::Keyword(_))
+                        | FmtTokenKind::Token(TokenType::Keyword)
+                )
+            {
+                line.push_str(&" ".repeat(inst.indent_level * 4));
+            }
+            line.push_str(&inst.color);
+            line.push_str(&inst.value);
+            line.push_str(&inst.postcolor);
+            if err {
+                line.push_str(&inst.postfix.replace("\n", ""));
+            } else {
+                line.push_str(&inst.postfix.replacen("\n", "", 1));
+            }
+        }
+        lines.push(line.trim_end_matches(' ').to_owned());
+        lines.join("\n").trim_start().to_owned()
+    }
+
+    fn format(&mut self) -> &mut Self {
+        let program = self;
+
+        let mut indent = 0;
+        let mut prev_newline = false;
+
+        let mut ip = 0;
+        let program_len = program.len();
+        while ip < program_len {
+            let mut tok = &mut program[ip];
+            let curr_prev_newline = prev_newline;
+            let curr_indent = indent;
+
+            use FmtTokenKind::*;
+            match &tok.kind {
+                Token(TokenType::Keyword) | Instruction(InstructionKind::Keyword(_)) => {
+                    match tok.value.as_str() {
+                        "while" => {
+                            if !curr_prev_newline {
+                                tok.prefix = "\n\n".to_owned();
+                            }
+                            tok.postfix = " ".to_owned();
+                            indent += 1;
+                            prev_newline = false;
+                        }
+                        "if" => {
+                            if !curr_prev_newline {
+                                tok.prefix = "\n".to_owned();
+                            }
+                            tok.prefix.push_str(&" ".repeat(curr_indent * 4));
+                            tok.postfix = " ".to_owned();
+                            indent += 1;
+                            prev_newline = false;
+                        }
+                        "else" => {
+                            if !curr_prev_newline {
+                                tok.prefix = "\n".to_owned();
+                                tok.prefix.push_str(&" ".repeat((curr_indent - 1) * 4));
+                            } else {
+                                tok.prefix.push_str(&" ".repeat((curr_indent - 1) * 4));
+                            }
+                            tok.postfix = "\n".to_owned();
+                            prev_newline = true;
+                        }
+                        "elif" => {
+                            if !curr_prev_newline {
+                                tok.prefix = "\n".to_owned();
+                                tok.prefix.push_str(&" ".repeat((curr_indent - 1) * 4));
+                            } else {
+                                tok.prefix.push_str(&" ".repeat((curr_indent - 1) * 4));
+                            }
+                            tok.postfix = " ".to_owned();
+                            prev_newline = false;
+                        }
+                        "else if" => {
+                            if !curr_prev_newline {
+                                tok.prefix = "\n".to_owned();
+                                tok.prefix.push_str(&" ".repeat((curr_indent - 1) * 4));
+                            }
+                            tok.postfix = " ".to_owned();
+                            prev_newline = false;
+                        }
+                        "end" => {
+                            if !curr_prev_newline {
+                                tok.prefix = "\n".to_owned();
+                                tok.prefix.push_str(&" ".repeat((curr_indent - 1) * 4));
+                            } else {
+                                tok.prefix.push_str(&" ".repeat((curr_indent - 1) * 4));
+                            }
+                            tok.postfix = "\n".to_owned();
+                            prev_newline = true;
+                            if indent > 0 {
+                                indent -= 1;
+                            }
+                            if ip + 1 < program_len {
+                                tok = &mut program[ip + 1];
+                                if !matches!(tok.kind, FmtTokenKind::Token(TokenType::Keyword)) {
+                                    tok = &mut program[ip];
+                                    tok.postfix.push_str("\n");
+                                }
+                            }
+                        }
+                        "do" => {
+                            tok.postfix = "\n".to_owned();
+                            prev_newline = true;
+                        }
+                        "macro" => {
+                            tok.prefix = "\n".to_owned();
+                            tok.postfix = " ".to_owned();
+                            ip += 1;
+                            tok = &mut program[ip];
+                            if let FmtTokenKind::Token(TokenType::Name) = tok.kind {
+                                tok.postfix = "\n".to_owned();
+                                prev_newline = true;
+                                indent += 1;
+                            } else {
+                                panic!()
+                            }
+                        }
+                        "include" => {
+                            if !curr_prev_newline {
+                                tok.prefix = "\n".to_owned();
+                                tok.prefix.push_str(&" ".repeat(curr_indent * 4));
+                            }
+                            tok.postfix = " ".to_owned();
+                            ip += 1;
+                            tok = &mut program[ip];
+                            if let FmtTokenKind::Token(TokenType::Value(Value::Str(_))) = tok.kind {
+                                tok.postfix = "\n\n".to_owned();
+                                prev_newline = true;
+                            } else {
+                                panic!()
+                            }
+                        }
+                        igl => {
+                            unreachable!("Unexpected keyword {}", igl);
+                        }
+                    }
+                }
+                _ => {
+                    tok.postfix = " ".to_owned();
+                    prev_newline = false;
+                    if curr_prev_newline {
+                        tok.prefix.push_str(&" ".repeat(curr_indent * 4));
+                    }
+                }
+            }
+            tok.indent_level = curr_indent;
+            ip += 1;
+        }
+
+        program
     }
 }
 
-pub fn fmt_program<'a>(program: &'a [Instruction]) -> Vec<FmtToken<'a>> {
-    let mut nest_level = 0;
-    let mut prev_caused_newline = false;
-    let mut last_was_include = false;
-    let mut line_len = 0;
-    program
-        .iter()
-        .enumerate()
-        .map(|(idx, inst)| {
-            let mut prefix = String::new();
-            let mut postfix = String::from(" ");
-            let kind_str = match &inst.kind {
-                crate::instruction::InstructionKind::Push(v) => match v {
-                    crate::instruction::Value::Str(s) => format!("\"{}\"", s),
+pub trait AsFmt<'a> {
+    fn as_fmt(&'a self) -> Vec<FmtToken<'a>>;
+}
+
+impl<'a> AsFmt<'a> for &'a [Instruction] {
+    fn as_fmt(&self) -> Vec<FmtToken<'a>> {
+        let mut fmt_tokens = Vec::new();
+        for token in self.iter() {
+            let token_str = match &token.kind {
+                InstructionKind::Push(val) => match val {
+                    Value::Str(s) => format!("\"{}\"", s),
+                    other => other.to_string(),
+                },
+                InstructionKind::Intrinsic(i) => i.to_string(),
+                InstructionKind::Op(op) => op.to_string(),
+                InstructionKind::Keyword(kw) => kw.to_string(),
+                InstructionKind::Name(name) => name.to_string(),
+                InstructionKind::Syscall(syscall) => syscall.to_string(),
+            };
+
+            fmt_tokens.push(FmtToken {
+                indent_level: 0,
+                prefix: String::new(),
+                color: String::new(),
+                value: token_str.clone(),
+                postcolor: String::new(),
+                postfix: String::new(),
+                loc: &token.loc,
+                kind: FmtTokenKind::Instruction(token.kind.clone()),
+            });
+        }
+        fmt_tokens
+    }
+}
+
+impl<'a> AsFmt<'a> for Vec<Token> {
+    fn as_fmt(&'a self) -> Vec<FmtToken<'a>> {
+        let mut fmt_tokens = Vec::new();
+        for token in self.iter() {
+            let token_str = match &token.ty {
+                TokenType::Intrinsic(i) => i.to_string(),
+                TokenType::Name => token.value.clone(),
+                TokenType::Comment => token.value.clone(),
+                TokenType::Op => token.value.clone(),
+                TokenType::Keyword => token.value.clone(),
+                TokenType::Value(v) => match v {
+                    Value::Str(s) => format!("\"{}\"", s),
                     v => v.to_string(),
                 },
-                k => k.to_string(),
+                TokenType::Syscall(_) => todo!(),
             };
-            let kind_str = kind_str.as_str();
 
-            if prev_caused_newline && kind_str.trim() != "end" {
-                for _ in 0..nest_level {
-                    prefix.insert_str(0, "    ");
-                }
-            }
-
-            match kind_str {
-                "if" => {
-                    prev_caused_newline = false;
-                    nest_level += 1;
-                }
-                "else" => {
-                    prev_caused_newline = true;
-                }
-                "elif" => {
-                    prefix.insert_str(0, "\n");
-                    prev_caused_newline = false;
-                }
-                "while" => {
-                    prefix.insert_str(0, "\n");
-                    prev_caused_newline = false;
-                    nest_level += 1;
-                }
-                "do" => {
-                    postfix = "\n".to_owned();
-                    prev_caused_newline = true;
-                }
-                "end" => {
-                    prefix.insert_str(0, "\n");
-                    postfix = "\n\n".to_owned();
-                    if nest_level > 0 {
-                        nest_level -= 1;
-                    }
-                    prev_caused_newline = true;
-                }
-                _ => {
-                    prev_caused_newline = false;
-                }
-            }
-
-            if !prev_caused_newline {
-                line_len += prefix.len() + kind_str.len();
-                if line_len > 30 {
-                    postfix = postfix.replacen(" ", "\n", 1);
-                    line_len = 0;
-                    prev_caused_newline = true;
-                }
-            }
-
-            FmtToken {
-                prefix,
-                value: kind_str.to_owned(),
-                postfix,
-                loc: &inst.loc,
-            }
-        })
-        .collect::<Vec<_>>()
+            fmt_tokens.push(FmtToken {
+                indent_level: 0,
+                prefix: String::new(),
+                color: String::new(),
+                value: token_str.clone(),
+                postcolor: String::new(),
+                postfix: String::new(),
+                loc: &token.location,
+                kind: FmtTokenKind::Token(token.ty.clone()),
+            });
+        }
+        fmt_tokens
+    }
 }
 
 pub enum Highlight {
@@ -268,12 +440,13 @@ pub fn highlight_program<'a>(
         if let Some(highlight) = highlights.get(&ip) {
             match highlight {
                 Highlight::Warning => {
-                    tok.value = format!("{}{}{}", "\x1b[33m", tok.value, "\x1b[0m");
+                    tok.color = "\x1b[33m".to_string();
                 }
                 Highlight::Error => {
-                    tok.value = format!("{}{}{}", "\x1b[91m\x1b[1m>>> ", tok.value, "\x1b[0m");
+                    tok.color = "\x1b[91m\x1b[1m".to_string();
                 }
             }
+            tok.postcolor = "\x1b[0m".to_string();
         }
     });
 }
@@ -287,18 +460,18 @@ pub fn err_spread(program: &Vec<Instruction>, ip: usize, secondary: Option<usize
 
     let start = if spread_len > ip { 0 } else { ip - spread_len };
     let end = (ip + spread_len).min(program.len());
-    let spread = start..end;
+    let spread = &program[start..end];
 
     let first_line = program[start].loc.1 - 1;
 
-    let mut tokens = fmt_program(&program[spread]);
+    let mut tokens = spread.as_fmt();
     let mut highlights = HashMap::new();
     highlights.insert(ip - start, Highlight::Error);
     if let Some(secondary) = secondary {
         highlights.insert(secondary - start, Highlight::Warning);
     }
     highlight_program(&mut tokens, highlights);
-    tokens.render(first_line, true, true)
+    tokens.format().render(first_line, true, true)
 }
 
 pub fn err_loc(loc: &(String, usize, usize)) -> String {

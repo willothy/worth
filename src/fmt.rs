@@ -28,7 +28,7 @@ mod sim;
 #[allow(unused)]
 mod typecheck;
 
-use error::{Error::IOError, IOError::*, RenderFmt};
+use error::{AsFmt, Error::IOError, IOError::*, RenderFmt};
 
 #[derive(Parser, Debug)]
 pub struct Args {
@@ -52,8 +52,8 @@ fn main() -> anyhow::Result<()> {
 
         let source = std::fs::read_to_string(&path).map_err(|e| IOError(Inherited(e)))?;
 
-        let program = parser::parse(source, name, path.clone())?;
-        let formatted = error::fmt_program(&program.instructions[..]).render(0, false, false);
+        let program = parser::parse_program(parser::Span::from(source.as_str()))?;
+        let formatted = program.as_fmt().format().render(0, false, false);
         std::fs::write(file, formatted)?;
     }
     Ok(())
