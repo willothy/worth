@@ -70,7 +70,7 @@ fn here(program: &mut Program) -> Result<()> {
 }
 
 fn includes(program: &mut Program, depth: usize) -> Result<()> {
-    // TODO: Search path for includes
+    // TODO(#3): Search path for includes
     let mut include_paths = Vec::new();
     let mut inst_to_remove = Vec::new();
 
