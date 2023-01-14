@@ -668,7 +668,7 @@ pub fn typecheck(program: &Program, debugger: bool) -> Result<()> {
                     })
                 }
             },
-            // TODO: Figure out how to typecheck syscall args and return types
+            // TODO(#4): Figure out how to typecheck syscall args and return types
             InstructionKind::Syscall(s) => {
                 require!(match s {
                     SyscallKind::Syscall0 => 1,
