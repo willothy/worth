@@ -62,7 +62,7 @@ pub fn mod_(asm: &mut Builder) {
 
 pub fn divmod(asm: &mut Builder) {
     comment!(asm, "-- divmod --");
-    // TODO: Test this
+    // TODO(#2): Test this
     asm!(
         asm,
         ("xor", "rdx, rdx"),
