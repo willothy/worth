@@ -37,7 +37,7 @@ pub fn mul(asm: &mut Builder) {
 
 pub fn div(asm: &mut Builder) {
     comment!(asm, "-- div --");
-    // TODO: Test this
+    // TODO(#1): Test this
     asm!(
         asm,
         ("xor", "rdx, rdx"),
